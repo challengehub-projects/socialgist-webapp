@@ -872,7 +872,7 @@ export default function Feed({
         post.description || "Check this post on SocialGist";
 
       const shareUrl =
-        `https://socialgist-app.vercel.app/post/${post.id}`;
+        `https://socialgist-webapp.vercel.app/post/${post.id}`;
 
       const username =
         `@${(post.profile_name || "user")
@@ -1155,6 +1155,7 @@ export default function Feed({
           const parsed =
             post.content || {};
 
+          console.log(post)
 
 
           return (
@@ -1658,16 +1659,16 @@ export default function Feed({
             </div>
           </div>
         )}
-
-        <ProfileModal
-          open={profileOpen}
-          onClose={() => setProfileOpen(false)}
-          profile={profileData}
-          isFollowing={profileData ? followingIds.includes(profileData.id) : false}
-          onFollowToggle={toggleFollow}
-        />
-
       </div>
+
+      <ProfileModal
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        profile={profileData}
+        isFollowing={profileData ? followingIds.includes(profileData.id) : false}
+        onFollowToggle={toggleFollow}
+      />
+
     </div >
   );
 }

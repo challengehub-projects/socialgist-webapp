@@ -14,6 +14,7 @@ import Messages from "./pages/messages";
 import ProfilePage from "./pages/profile";
 import ProfileModal from "./pages/profileModal";
 import NotificationsPage from "./pages/notifications";
+import PublicProfilePage from "./pages/publicProfile";
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -51,7 +52,7 @@ export default function App() {
   // ================= SPLASH UI =================
   if (showSplash) {
     return (
-      <div className="min-h-screen w-full bg-white flex items-center justify-center">
+      <div className="h-screen bg-white flex items-center justify-center">
         <div className="flex flex-col items-center">
           <img src="/icon.png" className="w-24 h-24 animate-pulse" />
           <h1 className="mt-4 text-2xl font-black text-purple-700">
@@ -124,6 +125,8 @@ export default function App() {
             session ? <Messages /> : <Navigate to="/" />
           }
         />
+
+       <Route path="/profile/:id" element={<PublicProfilePage />} />
 
         <Route
           path="/profile"

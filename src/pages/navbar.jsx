@@ -533,30 +533,42 @@ export default function TopNavbar({
   const incrementPostCount = async (userId) => {
     if (!userId) return;
 
-    // 1. get current count
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("posts_count")
-      .eq("id", userId)
-      .single();
+    try {
+      // 1. get current count
+      const { data, error: fetchError } = await supabase
+        .from("profiles")
+        .select("posts_count")
+        .eq("id", userId)
+        .single();
 
-    if (error) {
-      console.error("Fetch error:", error.message);
-      return;
-    }
+      if (fetchError) {
+        console.error("Fetch error:", fetchError.message);
+        return;
+      }
 
-    const current = data?.posts || 0;
+      const current = data?.posts_count || 0;
 
-    // 2. update with new value
-    const { error: updateError } = await supabase
-      .from("profiles")
-      .update({
-        posts_count: current + 1,
-      })
-      .eq("id", userId);
+      console.log("old:", current);
 
-    if (updateError) {
-      console.error("Update error:", updateError.message);
+      // 2. update with new value
+      const { data: updatedData, error: updateError } = await supabase
+        .from("profiles")
+        .update({
+          posts_count: current + 1,
+        })
+        .eq("id", userId)
+        .select(); // optional: returns updated row
+
+        console.log(updatedData)
+
+      if (updateError) {
+        console.error("Update error:", updateError.message);
+        return;
+      }
+
+      console.log("updated:", updatedData);
+    } catch (err) {
+      console.error("Unexpected error:", err);
     }
   };
 
@@ -695,10 +707,13 @@ export default function TopNavbar({
             },
           }; */
 
+      const url = await getProfilePicture();
+
+
       const payload = {
         user_id: userData.user.id,
         profile_name: userData.user.user_metadata?.full_name || "Anonymous",
-        profile_image: userData.user.user_metadata?.avatar_url || "",
+        profile_image: url,
         type: image ? "image_post" : "text_post",
         description,
         image: uploadedImage,
@@ -713,9 +728,9 @@ export default function TopNavbar({
 
       if (!isOnline) {
 
-        await saveOfflinePost(
-          payload
-        );
+        /*      await saveOfflinePost(
+               payload
+             ); */
 
         /*   await Toast.show({
             text:

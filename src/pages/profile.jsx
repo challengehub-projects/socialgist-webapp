@@ -16,8 +16,6 @@ export default function ProfilePage({ onBack }) {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  console.log(profile)
-
   // FETCH PROFILE
   useEffect(() => {
     const fetchProfile = async () => {
@@ -42,9 +40,6 @@ export default function ProfilePage({ onBack }) {
         .select("*")
         .eq("id", userId)
         .single();
-
-
-      console.log(data)
 
       if (!error && data) {
         let updated = { ...data };
@@ -155,26 +150,27 @@ export default function ProfilePage({ onBack }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#12081f] text-white p-6 animate-pulse">
-        <div className="h-32 bg-purple-900/40 rounded-2xl" />
-        <div className="h-24 w-24 bg-purple-800/40 rounded-full -mt-12 ml-6 border-4 border-[#12081f]" />
-        <div className="h-4 w-40 bg-purple-800/40 mt-4 rounded" />
+      <div className="min-h-screen bg-black text-white animate-pulse p-6">
+        <div className="h-56 bg-purple-900/30 rounded-3xl" />
+        <div className="h-24 w-24 bg-purple-800/30 rounded-full -mt-12 ml-6 border-4 border-black" />
       </div>
     );
   }
 
   if (!profile) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#12081f] text-white">
+      <div className="min-h-screen flex items-center justify-center bg-black text-white">
         No profile found
       </div>
     );
   }
 
   const Field = ({ label, value, field }) => (
-    <div className="flex justify-between items-center py-3 border-b border-white/10">
+    <div className="py-3 border-b border-white/10 flex justify-between items-start gap-4">
       <div className="w-full">
-        <p className="text-xs text-purple-300 uppercase">{label}</p>
+        <p className="text-[11px] text-purple-300 uppercase tracking-wider">
+          {label}
+        </p>
 
         {editing[field] ? (
           <input
@@ -183,11 +179,13 @@ export default function ProfilePage({ onBack }) {
               updateField(field, e.target.value);
               toggleEdit(field);
             }}
-            className="w-full mt-1 bg-purple-900/30 text-white px-3 py-2 rounded-xl outline-none"
+            className="w-full mt-1 bg-white/5 text-white px-3 py-2 rounded-xl outline-none"
             autoFocus
           />
         ) : (
-          <p className="text-white mt-1 text-sm">{value || "Not set"}</p>
+          <p className="text-sm text-white mt-1">
+            {value || "Not set"}
+          </p>
         )}
       </div>
 
@@ -201,42 +199,47 @@ export default function ProfilePage({ onBack }) {
   );
 
   return (
-    <div className="min-h-screen bg-[#0b0614] text-white px-4 py-10">
-      <div className="max-w-xl mx-auto">
+    <div className="min-h-screen bg-black text-white">
+      <div className="max-w-xl mx-auto pb-10">
 
         {/* HEADER */}
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-3 px-4 py-4">
           <button
             onClick={() => navigate("/feed")}
-            className="w-9 h-9 rounded-full bg-purple-900/40 flex items-center justify-center"
+            className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center"
           >
             <FiArrowLeft />
           </button>
 
           <div>
-            <h1 className="font-bold">Profile</h1>
+            <h1 className="font-bold text-lg">Profile</h1>
             <p className="text-xs text-purple-300">
               @{profile.username}
             </p>
           </div>
         </div>
 
-        {/* COVER */}
-        <div className="h-32 rounded-3xl bg-gradient-to-r from-purple-900 via-purple-700 to-fuchsia-700" />
+        {/* COVER IMAGE */}
+        <div className="relative h-56 mx-4 rounded-3xl overflow-hidden">
+          <img
+            src="https://images.unsplash.com/photo-1520975916090-3105956dac38?q=80&w=1600"
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+        </div>
 
-        {/* PROFILE HEADER (IMAGE POSITION KEPT SAME) */}
-        <div className="flex items-end gap-4 -mt-12 px-4">
-
+        {/* PROFILE IMAGE FLOAT */}
+        <div className="flex items-end gap-4 px-6 -mt-14 relative z-10">
           <div className="relative">
             <img
               src={
                 profile.avatar_url ||
                 `https://ui-avatars.com/api/?name=${profile.full_name}`
               }
-              className="w-24 h-24 rounded-full border-4 border-[#0b0614] object-cover"
+              className="w-28 h-28 rounded-full border-4 border-black object-cover"
             />
 
-            <label className="absolute bottom-1 right-1 bg-purple-700 p-2 rounded-full cursor-pointer">
+            <label className="absolute bottom-2 right-2 bg-purple-600 p-2 rounded-full cursor-pointer">
               <FiCamera size={14} />
               <input
                 type="file"
@@ -262,14 +265,13 @@ export default function ProfilePage({ onBack }) {
         </div>
 
         {/* STATS */}
-        <div className="mt-6 grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-3 px-4 mt-6">
           {["Posts", "Followers", "Following"].map((t, i) => (
-           
             <div
               key={t}
-              className="bg-purple-900/30 rounded-2xl p-4 text-center border border-white/10"
+              className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center"
             >
-              <p className="font-bold text-lg">
+              <p className="text-lg font-bold">
                 {[profile.posts_count, profile.followers_count, profile.following_count][i] || 0}
               </p>
               <p className="text-xs text-purple-300">{t}</p>
@@ -278,7 +280,7 @@ export default function ProfilePage({ onBack }) {
         </div>
 
         {/* FIELDS */}
-        <div className="mt-6 bg-purple-900/20 border border-white/10 rounded-3xl p-4">
+        <div className="mt-6 mx-4 bg-white/5 border border-white/10 rounded-3xl p-4">
           <Field label="Bio" field="bio" value={profile.bio} />
           <Field label="Website" field="website" value={profile.website} />
           <Field label="Location" field="location" value={profile.location} />
