@@ -24,8 +24,20 @@
 .animate-slideUp {
   animation: slideUp 0.25s ease-out;
 }
+
 html, body, #root {
   height: 100%;
   margin: 0;
   padding: 0;
+  overflow: hidden;
+}
+
+/* FORCE FULLSCREEN OVERRIDE */
+body {
+  padding-top: 0 !important;
+}
+
+#root {
+  position: fixed;
+  inset: 0;
 }
