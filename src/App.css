@@ -1,0 +1,81 @@
+.icon-btn {
+  @apply relative flex items-center justify-center shrink-0 h-10 w-10 min-h-[40px] min-w-[40px] rounded-full bg-gray-100 dark:bg-[#3A3B3C] hover:bg-gray-200 dark:hover:bg-[#4E4F50] text-gray-700 dark:text-gray-200 transition-all duration-200 ease-out;
+}
+
+.nav-icon {
+  @apply h-5 w-5 shrink-0 pointer-events-none;
+}
+
+.notif-badge {
+  @apply absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white rounded-full bg-purple-600 ring-2 ring-white dark:ring-[#242526];
+}
+
+
+/* BACKDROP FADE */
+@keyframes profileBackdrop {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+
+  to {
+    opacity: 1;
+    backdrop-filter: blur(12px);
+  }
+}
+
+.profile-backdrop {
+  animation: profileBackdrop 0.25s ease forwards;
+}
+
+/* BOTTOM SHEET SLIDE */
+@keyframes profileSheet {
+  from {
+    transform: translateY(100%);
+    opacity: 0.9;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.profile-sheet {
+  animation: profileSheet 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+/* CONTENT FADE */
+@keyframes profileContent {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.profile-content {
+  animation: profileContent 0.4s ease 0.12s both;
+}
+
+
+@keyframes zoomIn {
+  from {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-zoomIn {
+  animation: zoomIn 0.25s ease-out;
+}

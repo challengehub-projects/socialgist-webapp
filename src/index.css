@@ -1,0 +1,26 @@
+.icon-btn {
+  @apply relative flex items-center justify-center shrink-0 h-10 w-10 min-h-[40px] min-w-[40px] rounded-full bg-gray-100 dark:bg-[#3A3B3C] hover:bg-gray-200 dark:hover:bg-[#4E4F50] text-gray-700 dark:text-gray-200 transition-all duration-200 ease-out;
+}
+
+.nav-icon {
+  @apply h-5 w-5 shrink-0 pointer-events-none;
+}
+
+.notif-badge {
+  @apply absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white rounded-full bg-purple-600 ring-2 ring-white dark:ring-[#242526];
+}
+
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+.animate-slideUp {
+  animation: slideUp 0.25s ease-out;
+}
