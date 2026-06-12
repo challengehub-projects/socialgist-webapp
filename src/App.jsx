@@ -51,7 +51,7 @@ export default function App() {
   // ================= SPLASH UI =================
   if (showSplash) {
     return (
-      <div className="h-screen bg-white flex items-center justify-center">
+      <div className="min-h-screen w-full bg-white flex items-center justify-center">
         <div className="flex flex-col items-center">
           <img src="/icon.png" className="w-24 h-24 animate-pulse" />
           <h1 className="mt-4 text-2xl font-black text-purple-700">
