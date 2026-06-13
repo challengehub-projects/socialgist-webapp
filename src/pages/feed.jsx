@@ -694,6 +694,28 @@ export default function Feed({
     };
   }, [me?.id]);
 
+  const LIKES_KEY = "liked_posts_v1";
+
+  // ================= SAVE TO LOCALSTORAGE =================
+  const saveLikesToLocal = (likesMap) => {
+    try {
+      localStorage.setItem(LIKES_KEY, JSON.stringify(likesMap));
+    } catch (err) {
+      console.log("SAVE LOCAL LIKES ERROR:", err);
+    }
+  };
+
+  // ================= LOAD FROM LOCALSTORAGE =================
+  const loadLikesFromLocal = () => {
+    try {
+      const value = localStorage.getItem(LIKES_KEY);
+      return value ? JSON.parse(value) : {};
+    } catch (err) {
+      console.log("LOAD LOCAL LIKES ERROR:", err);
+      return {};
+    }
+  };
+
   useEffect(() => {
     const channel = supabase
       .channel("follow-realtime")
@@ -785,133 +807,115 @@ export default function Feed({
     if (!userId) return;
 
     try {
-      const { data, error } = await supabase
-        .from("likes")
-        .select("post_id")
-        .eq("user_id", userId);
+      const local = localStorage.getItem("liked_posts_v1");
+      const likesMap = local ? JSON.parse(local) : {};
 
-      if (error) {
-        console.log("LOAD LIKES ERROR:", error);
-        return;
-      }
-
-      const likesMap = {};
-
-      (data || []).forEach((like) => {
-        likesMap[like.post_id] = true;
-      });
-
-      // ✅ ONLY sync liked posts from DB (DO NOT touch animations)
       setLikedPosts(likesMap);
-
-      console.log("LIKES LOADED:", likesMap);
     } catch (err) {
-      console.log("LOAD LIKES EXCEPTION:", err);
+      console.log("LOAD LIKES ERROR:", err);
+      setLikedPosts({});
     }
   };
 
 
-  // ================= INIT ON LOGIN =================
   useEffect(() => {
-    if (me?.id) {
-      loadUserLikes(me.id);
-    }
-  }, [me?.id]);
+    if (!me?.id) return;
 
+    const localLikes = localStorage.getItem("liked_posts_v1");
+    setLikedPosts(localLikes ? JSON.parse(localLikes) : {});
+  }, [me?.id]);
 
   const likePost = async (postId) => {
     if (!me?.id || !postId) return;
 
     try {
-      // prevent spam clicks
       if (animatingLike === postId) return;
 
       setAnimatingLike(postId);
-      setTimeout(() => setAnimatingLike(null), 350);
+      setTimeout(() => setAnimatingLike(null), 400);
 
-      const isLiked = !!likedPosts[postId];
+      const alreadyLiked = !!likedPosts[postId];
 
-      // ================= OPTIMISTIC UI =================
-      setLikedPosts((prev) => ({
-        ...prev,
-        [postId]: !isLiked,
-      }));
+      // ================= UI UPDATE =================
+      const updatedPosts = posts.map((post) => {
+        if (post.id === postId) {
+          return {
+            ...post,
+            likes_count: alreadyLiked
+              ? Math.max(0, (post.likes_count || 0) - 1)
+              : (post.likes_count || 0) + 1,
+          };
+        }
+        return post;
+      });
 
-      setPosts((prev) =>
-        prev.map((post) =>
-          post.id === postId
-            ? {
-              ...post,
-              likes_count: Math.max(
-                0,
-                (post.likes_count || 0) + (isLiked ? -1 : 1)
-              ),
-            }
-            : post
-        )
+      setPosts(updatedPosts);
+
+      // ================= LOCAL CACHE =================
+      const updatedLikes = {
+        ...likedPosts,
+        [postId]: !alreadyLiked,
+      };
+
+      setLikedPosts(updatedLikes);
+
+      localStorage.setItem(
+        "liked_posts_v1",
+        JSON.stringify(updatedLikes)
       );
 
-      // ================= DATABASE SYNC =================
-      if (isLiked) {
-        // UNLIKE
-        const { error } = await supabase
-          .from("likes")
-          .delete()
-          .eq("user_id", me.id)
-          .eq("post_id", postId);
+      // ================= OFFLINE QUEUE =================
+      const pendingKey = "pending_likes";
+      const pendingRaw = localStorage.getItem(pendingKey);
+      const pending = pendingRaw ? JSON.parse(pendingRaw) : [];
 
-        if (error) {
-          console.log("UNLIKE ERROR:", error);
+      const action = alreadyLiked ? "unlike" : "like";
 
-          // rollback UI
-          setLikedPosts((prev) => ({
-            ...prev,
-            [postId]: true,
-          }));
+      pending.push({
+        postId,
+        action,
+        userId: me.id,
+        timestamp: Date.now(),
+      });
 
-          setPosts((prev) =>
-            prev.map((post) =>
-              post.id === postId
-                ? {
-                  ...post,
-                  likes_count: (post.likes_count || 1) + 1,
-                }
-                : post
-            )
-          );
-        }
-      } else {
-        // LIKE
-        const { error } = await supabase.from("likes").insert({
-          user_id: me.id,
-          post_id: postId,
-        });
+      localStorage.setItem(pendingKey, JSON.stringify(pending));
 
-        if (error) {
-          console.log("LIKE ERROR:", error);
+      // ================= NETWORK CHECK =================
+      const online = navigator.onLine;
 
-          // rollback UI
-          setLikedPosts((prev) => ({
-            ...prev,
-            [postId]: false,
-          }));
+      if (!online) return;
 
-          setPosts((prev) =>
-            prev.map((post) =>
-              post.id === postId
-                ? {
-                  ...post,
-                  likes_count: Math.max(0, (post.likes_count || 0) - 1),
-                }
-                : post
-            )
-          );
-        }
+      // ================= SYNC TO SUPABASE =================
+      const { data: currentPost, error: fetchError } = await supabase
+        .from("posts")
+        .select("likes_count")
+        .eq("id", postId)
+        .single();
+
+      if (fetchError) {
+        console.log(fetchError);
+        return;
       }
 
-      console.log("LIKE TOGGLED:", postId);
+      const currentLikes = currentPost?.likes_count || 0;
+
+      const newLikes = alreadyLiked
+        ? Math.max(0, currentLikes - 1)
+        : currentLikes + 1;
+
+      const { error } = await supabase
+        .from("posts")
+        .update({ likes_count: newLikes })
+        .eq("id", postId);
+
+      if (error) {
+        console.log("DB UPDATE ERROR:", error);
+        return;
+      }
+
+      console.log("LIKE SYNCED:", postId, newLikes);
     } catch (err) {
-      console.log("LIKE POST ERROR:", err);
+      console.log("LIKE ERROR:", err);
     }
   };
   // ================= SHARE (WEB ONLY) =================
@@ -1289,20 +1293,23 @@ export default function Feed({
 
               {/* IMAGE / MEDIA */}
               {post.image && (
-                <div className="relative w-full overflow-hidden bg-black rounded-2xl">
+                <div className="relative w-full bg-black overflow-hidden">
 
                   {/* IMAGE */}
                   <img
                     src={post.cached_image || post.image}
                     alt=""
-                    className="w-full max-h-[500px] object-cover"
+                    className="w-full h-auto object-cover"
+                    style={{
+                      maxHeight: "none", // remove limit
+                    }}
                   />
 
                   {/* TEXT LAYERS */}
                   {parsed?.layers?.map((layer) => (
                     <div
                       key={layer.id}
-                      className="absolute px-2 py-1 rounded-md font-bold break-words max-w-[90%]"
+                      className="absolute px-2 py-1 font-bold break-words max-w-[90%]"
                       style={{
                         left: layer.x,
                         top: layer.y,
@@ -1322,35 +1329,28 @@ export default function Feed({
               {/* TEXT ONLY POST */}
               {!post.image && parsed?.background && (
                 <div
-                  className="relative w-full min-h-[280px] flex items-center justify-center px-6 py-10 overflow-hidden rounded-2xl"
-                  style={{ background: parsed.background }}
+                  className="relative w-full min-h-[400px] flex items-center justify-center px-6 py-12 overflow-hidden"
+                  style={{
+                    background: parsed.background,
+                    width: "100%",
+                  }}
                 >
 
                   {/* CENTER TEXT */}
                   {parsed?.text && (
                     <div
-                      className="
-          text-white
-          text-center
-          font-extrabold
-          text-2xl
-          sm:text-3xl
-          leading-snug
-          whitespace-pre-wrap
-          break-words
-          max-w-[90%]
-        "
+                      className="text-white text-center font-extrabold text-3xl sm:text-4xl leading-snug whitespace-pre-wrap break-words max-w-[95%]"
                     >
                       {parsed.text}
                     </div>
                   )}
 
-                  {/* LAYER MODE (IMPROVED) */}
+                  {/* LAYER MODE */}
                   {!parsed?.text &&
                     parsed?.layers?.map((layer) => (
                       <div
                         key={layer.id}
-                        className="absolute px-2 py-1 max-w-[85%] font-bold break-words"
+                        className="absolute px-2 py-1 font-bold break-words max-w-[90%]"
                         style={{
                           left: layer.x,
                           top: layer.y,
@@ -1364,8 +1364,7 @@ export default function Feed({
                       </div>
                     ))}
                 </div>
-              )
-              }
+              )}
               {/* ACTIONS */}
 
               <div className="px-4 py-3">
@@ -1383,7 +1382,7 @@ export default function Feed({
                       <Heart
                         size={25}
                         className="text-red-500"
-                        fill={likedPosts[post.id] ? "currentColor" : "none"}
+                        fill="CurrentColor"
                       />
                       <span className="text-sm text-gray-600 dark:text-gray-300 font-medium">
                         {post.likes_count || 0}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function ProfileModal({
@@ -12,11 +12,21 @@ export default function ProfileModal({
 }) {
   const [imageOpen, setImageOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
-  const [loadingProfile, setLoadingProfile] = useState(true);
+
+  // ✅ LOCAL UI STATE (IMPORTANT FIX)
+  const [followersCount, setFollowersCount] = useState(
+    profile?.followers_count || 0
+  );
 
   const navigate = useNavigate();
 
-  // ESC CLOSE
+  const username =
+    profile?.full_name?.replace(/\s+/g, "").toLowerCase() || "user";
+
+  const isOwnProfile =
+    currentUserId && profile?.id === currentUserId;
+
+  // ================= ESC CLOSE =================
   useEffect(() => {
     const handleKey = (e) => {
       if (e.key === "Escape") onClose();
@@ -26,26 +36,14 @@ export default function ProfileModal({
     return () => window.removeEventListener("keydown", handleKey);
   }, [onClose]);
 
-  // sync loading state when profile changes
+  // ================= SYNC PROFILE CHANGES =================
   useEffect(() => {
-    if (open) {
-      setLoadingProfile(true);
-
-      const t = setTimeout(() => {
-        setLoadingProfile(false);
-      }, 500); // small smooth delay
-
-      return () => clearTimeout(t);
+    if (profile?.followers_count !== undefined) {
+      setFollowersCount(profile.followers_count);
     }
-  }, [profile, open]);
+  }, [profile?.followers_count]);
 
   if (!open) return null;
-
-  const username =
-    profile?.full_name?.replace(/\s+/g, "").toLowerCase() || "user";
-
-  const isOwnProfile =
-    currentUserId && profile?.id === currentUserId;
 
   return (
     <div className="fixed inset-0 z-[99999] flex items-end justify-center">
@@ -77,168 +75,135 @@ export default function ProfileModal({
         {/* CONTENT */}
         <div className="relative flex-1 overflow-y-auto bg-white rounded-t-[40px] px-6 pt-8 pb-10">
 
-          {/* ================= SKELETON ================= */}
-          {loadingProfile || !profile ? (
-            <div className="animate-pulse">
-
-              {/* AVATAR */}
-              <div className="flex justify-center">
-                <div className="w-32 h-32 rounded-full bg-gray-200" />
+          {/* AVATAR */}
+          <div className="flex justify-center">
+            {profile?.avatar_url ? (
+              <img
+                src={profile.avatar_url}
+                onClick={() => {
+                  setZoom(1);
+                  setImageOpen(true);
+                }}
+                className="w-32 h-32 rounded-full object-cover border-4 border-purple-100 shadow-xl cursor-pointer"
+              />
+            ) : (
+              <div className="w-32 h-32 rounded-full bg-purple-600 flex items-center justify-center text-white text-5xl font-bold">
+                {(profile?.full_name || "U")[0]}
               </div>
+            )}
+          </div>
 
-              {/* NAME */}
-              <div className="mt-6 flex justify-center">
-                <div className="h-6 w-48 bg-gray-200 rounded-lg" />
+          {/* NAME */}
+          <h1 className="mt-6 text-center text-3xl font-bold text-gray-900">
+            {profile?.full_name || "Anonymous User"}
+          </h1>
+
+          {/* USERNAME */}
+          <p className="text-center text-gray-500 mt-2">
+            @{username}
+          </p>
+
+          {/* BIO */}
+          <p className="text-center text-gray-600 mt-5 max-w-md mx-auto">
+            {profile?.bio || "No bio yet."}
+          </p>
+
+          {/* STATS */}
+          <div className="grid grid-cols-3 gap-3 mt-8">
+
+            <div className="bg-purple-50 rounded-3xl p-4 text-center">
+              <div className="font-bold text-2xl text-purple-700">
+                {profile?.posts_count || 0}
               </div>
-
-              {/* USERNAME */}
-              <div className="mt-3 flex justify-center">
-                <div className="h-4 w-24 bg-gray-100 rounded-lg" />
-              </div>
-
-              {/* BIO */}
-              <div className="mt-6 space-y-2 flex flex-col items-center">
-                <div className="h-3 w-64 bg-gray-100 rounded" />
-                <div className="h-3 w-56 bg-gray-100 rounded" />
-                <div className="h-3 w-40 bg-gray-100 rounded" />
-              </div>
-
-              {/* STATS */}
-              <div className="grid grid-cols-3 gap-3 mt-8">
-                {[1, 2, 3].map((i) => (
-                  <div
-                    key={i}
-                    className="bg-gray-100 rounded-3xl p-4 text-center space-y-2"
-                  >
-                    <div className="h-6 w-10 mx-auto bg-gray-200 rounded" />
-                    <div className="h-3 w-14 mx-auto bg-gray-200 rounded" />
-                  </div>
-                ))}
-              </div>
-
-              {/* BUTTONS */}
-              <div className="flex gap-3 mt-8">
-                <div className="flex-1 h-14 rounded-2xl bg-gray-200" />
-                <div className="flex-1 h-14 rounded-2xl bg-gray-100" />
-              </div>
-
+              <div className="text-sm text-gray-500">Posts</div>
             </div>
-          ) : (
-            <>
-              {/* AVATAR */}
-              <div className="flex justify-center">
-                {profile?.avatar_url ? (
-                  <img
-                    src={profile.avatar_url}
-                    onClick={() => {
-                      setZoom(1);
-                      setImageOpen(true);
-                    }}
-                    className="w-32 h-32 rounded-full object-cover border-4 border-purple-100 shadow-xl cursor-pointer"
-                  />
-                ) : (
-                  <div className="w-32 h-32 rounded-full bg-purple-600 flex items-center justify-center text-white text-5xl font-bold">
-                    {(profile?.full_name || "U")[0]}
-                  </div>
-                )}
+
+            <div className="bg-purple-50 rounded-3xl p-4 text-center">
+              <div className="font-bold text-2xl text-purple-700">
+                {followersCount}
+              </div>
+              <div className="text-sm text-gray-500">Followers</div>
+            </div>
+
+            <div className="bg-purple-50 rounded-3xl p-4 text-center">
+              <div className="font-bold text-2xl text-purple-700">
+                {profile?.following_count || 0}
+              </div>
+              <div className="text-sm text-gray-500">Following</div>
+            </div>
+
+          </div>
+
+          {/* BUTTONS */}
+          <div className="flex gap-3 mt-8">
+
+            {isOwnProfile ? (
+              <button
+                onClick={() => navigate(`/profile/${profile.id}`)}
+                className="flex-1 h-14 rounded-2xl bg-purple-600 text-white font-semibold"
+              >
+                View Profile
+              </button>
+            ) : (
+              <>
+                {/* FOLLOW BUTTON */}
+                <button
+                  onClick={() => {
+                    const willFollow = !isFollowing;
+
+                    // ✅ instant UI update (NO refresh)
+                    setFollowersCount((prev) =>
+                      willFollow ? prev + 1 : Math.max(0, prev - 1)
+                    );
+
+                    onFollowToggle?.(profile);
+                  }}
+                  className="flex-1 h-14 rounded-2xl bg-purple-600 text-white font-semibold"
+                >
+                  {isFollowing ? "Following" : "Follow"}
+                </button>
+
+                <button
+                  onClick={() => navigate(`/profile/${profile.id}`)}
+                  className="flex-1 h-14 rounded-2xl border-2 border-purple-200 text-purple-700 font-semibold"
+                >
+                  View Profile
+                </button>
+              </>
+            )}
+
+          </div>
+
+          {/* IMAGE ZOOM MODAL */}
+          {imageOpen && (
+            <div className="fixed inset-0 z-[999999] bg-black flex items-center justify-center">
+
+              {/* BACKDROP (tap to close) */}
+              <div
+                className="absolute inset-0"
+                onClick={() => setImageOpen(false)}
+              />
+
+              {/* TOP BAR (WhatsApp style) */}
+              <div className="absolute top-0 left-0 right-0 flex items-center p-4 z-10">
+                <button
+                  onClick={() => setImageOpen(false)}
+                  className="flex items-center justify-center w-10 h-10 rounded-full bg-black/40 text-white"
+                >
+                  <ArrowLeft size={20} />
+                </button>
               </div>
 
-              {/* NAME */}
-              <h1 className="mt-6 text-center text-3xl font-bold text-gray-900">
-                {profile?.full_name || "Anonymous User"}
-              </h1>
-
-              {/* USERNAME */}
-              <p className="text-center text-gray-500 mt-2">
-                @{username}
-              </p>
-
-              {/* BIO */}
-              <p className="text-center text-gray-600 mt-5 max-w-md mx-auto">
-                {profile?.bio || "No bio yet."}
-              </p>
-
-              {/* STATS */}
-              <div className="grid grid-cols-3 gap-3 mt-8">
-
-                <div className="bg-purple-50 rounded-3xl p-4 text-center">
-                  <div className="font-bold text-2xl text-purple-700">
-                    {profile?.posts_count || 0}
-                  </div>
-                  <div className="text-sm text-gray-500">Posts</div>
-                </div>
-
-                <div className="bg-purple-50 rounded-3xl p-4 text-center">
-                  <div className="font-bold text-2xl text-purple-700">
-                    {profile?.followers_count || 0}
-                  </div>
-                  <div className="text-sm text-gray-500">Followers</div>
-                </div>
-
-                <div className="bg-purple-50 rounded-3xl p-4 text-center">
-                  <div className="font-bold text-2xl text-purple-700">
-                    {profile?.following_count || 0}
-                  </div>
-                  <div className="text-sm text-gray-500">Following</div>
-                </div>
-
-              </div>
-
-              {/* BUTTONS */}
-              <div className="flex gap-3 mt-8">
-
-                {isOwnProfile ? (
-                  <button
-                    onClick={() => navigate(`/profile/${profile.id}`)}
-                    className="flex-1 h-14 rounded-2xl bg-purple-600 text-white font-semibold"
-                  >
-                    View Profile
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => onFollowToggle?.(profile)}
-                      className="flex-1 h-14 rounded-2xl bg-purple-600 text-white font-semibold"
-                    >
-                      {isFollowing ? "Following" : "Follow"}
-                    </button>
-
-                    <button
-                      onClick={() => navigate(`/profile/${profile.id}`)}
-                      className="flex-1 h-14 rounded-2xl border-2 border-purple-200 text-purple-700 font-semibold"
-                    >
-                      View Profile
-                    </button>
-                  </>
-                )}
-
-              </div>
-
-              {/* IMAGE ZOOM MODAL */}
-              {imageOpen && (
-                <div className="fixed inset-0 z-[999999] bg-black flex items-center justify-center">
-                  <div
-                    className="absolute inset-0"
-                    onClick={() => setImageOpen(false)}
-                  />
-
-                  <img
-                    src={profile?.avatar_url}
-                    style={{ transform: `scale(${zoom})` }}
-                    onClick={() => setZoom((z) => Math.min(z + 0.3, 3))}
-                    className="max-w-full max-h-full object-contain cursor-zoom-in"
-                  />
-
-                  <button
-                    onClick={() => setImageOpen(false)}
-                    className="absolute top-5 right-5 bg-white text-black w-10 h-10 rounded-full"
-                  >
-                    ✕
-                  </button>
-                </div>
-              )}
-            </>
+              {/* IMAGE */}
+              <img
+                src={profile?.avatar_url}
+                style={{ transform: `scale(${zoom})` }}
+                onClick={() => setZoom((z) => Math.min(z + 0.3, 3))}
+                className="max-w-full max-h-full object-contain cursor-zoom-in transition-transform duration-150"
+              />
+            </div>
           )}
+
         </div>
       </div>
     </div>
