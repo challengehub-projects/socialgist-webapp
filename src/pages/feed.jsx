@@ -85,6 +85,23 @@ export default function Feed({
   const POSTS_PER_PAGE = 5;
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [profileImages, setProfileImages] = useState({});
+
+  const getProfileImage = async (userId) => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("avatar_url")
+      .eq("id", userId)
+      .single();
+
+    if (error) {
+      console.error("Error fetching profile image:", error);
+      return null;
+    }
+
+    return data.avatar_url;
+  };
+
 
 
 
@@ -537,8 +554,18 @@ export default function Feed({
         return;
       }
 
+      const imageMap = {};
 
-      console.log(data)
+      await Promise.all(
+        data.map(async (postData) => {
+          const avatarUrl = await getProfileImage(postData.user_id);
+
+          imageMap[postData.user_id] = avatarUrl;
+        })
+      );
+
+      setProfileImages(imageMap);
+
 
       if (data) {
         let formatted =
@@ -550,8 +577,6 @@ export default function Feed({
 
 
 
-
-        /*   setPosts(formatted); */
 
         setPosts((prev) => {
           const merged =
@@ -1260,7 +1285,7 @@ export default function Feed({
                 {/* AVATAR */}
                 {post.profile_image ? (
                   <img
-                    src={post.profile_image}
+                    src={profileImages[post.user_id]}
                     alt={post.profile_name || "User"}
                     /*   onClick={() =>
                         openProfileModal({
