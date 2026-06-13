@@ -208,6 +208,18 @@ export default function Feed({
   };
 
   useEffect(() => {
+    const setupPush = async () => {
+      if (!me?.id) return;
+
+      await OneSignal.login(me.id);
+
+      console.log("subscribed")
+    };
+
+    setupPush();
+  }, [me]);
+
+  useEffect(() => {
     setPage(0);
     setPosts([]);
     fetchPosts(true);
@@ -826,6 +838,33 @@ export default function Feed({
   }, [me?.id]);
 
   const likePost = async (postId) => {
+
+    const sendNotification = async (playerId, title, body) => {
+      const res = await fetch("https://api.onesignal.com/notifications", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "os_v2_app_5gcbcpptxzhivdgeskhu7nelml4cwe77ul2u4k5rpyuipn7a5yddmk5lnzmnc5m4xqg7uftj5yoibaypn3uhb3q7fnzt5lxe2pjq5by",
+        },
+        body: JSON.stringify({
+          app_id: "e984113d-f3be-4e8a-8cc4-928f4fb48b62",
+
+          // ✅ FIX HERE
+          include_aliases: {
+            external_id: [playerId],
+          },
+
+          target_channel: "push",
+
+          headings: { en: title },
+          contents: { en: body },
+        }),
+      });
+
+      const data = await res.json();
+      console.log("ONESIGNAL RESPONSE:", data);
+    };
+    sendNotification();
     if (!me?.id || !postId) return;
 
     try {
