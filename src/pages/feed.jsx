@@ -777,93 +777,143 @@ export default function Feed({
         "scroll",
         handleScroll
       );
+
   }, [posts, hasMore]);
 
 
-  // ================= LIKE POST =================
-  const likePost = async (postId) => {
+  const loadUserLikes = async (userId) => {
+    if (!userId) return;
+
     try {
-      const alreadyLiked = likedPosts[postId];
-
-      setAnimatingLike(postId);
-
-      setTimeout(() => {
-        setAnimatingLike(null);
-      }, 400);
-
-      // ================= UPDATE UI IMMEDIATELY =================
-      const updatedPosts = posts.map((post) => {
-        if (post.id === postId) {
-          return {
-            ...post,
-            likes_count: alreadyLiked
-              ? Math.max(0, (post.likes_count || 0) - 1)
-              : (post.likes_count || 0) + 1,
-          };
-        }
-        return post;
-      });
-
-      setPosts(updatedPosts);
-
-      // (optional) cache locally if you still want UI persistence
-      // await cachePosts(updatedPosts);
-
-      // ================= UPDATE LOCAL LIKE STATE =================
-      const updatedLikes = {
-        ...likedPosts,
-        [postId]: !alreadyLiked,
-      };
-
-      setLikedPosts(updatedLikes);
-
-      // (optional) cache likes
-      // await cacheLikes(updatedLikes);
-
-      // ================= UPDATE SUPABASE (ONLINE ONLY) =================
-      const { data: currentPost, error: fetchError } = await supabase
-        .from("posts")
-        .select("likes_count")
-        .eq("id", postId)
-        .single();
-
-      if (fetchError) {
-        console.log(fetchError);
-        return;
-      }
-
-      const currentLikes = currentPost?.likes_count || 0;
-
-      const newLikes = alreadyLiked
-        ? Math.max(0, currentLikes - 1)
-        : currentLikes + 1;
-
-      const { error } = await supabase
-        .from("posts")
-        .update({ likes_count: newLikes })
-        .eq("id", postId);
+      const { data, error } = await supabase
+        .from("likes")
+        .select("post_id")
+        .eq("user_id", userId);
 
       if (error) {
-        console.log(error);
+        console.log("LOAD LIKES ERROR:", error);
         return;
       }
 
-      // ================= OPTIONAL NOTIFICATION (WEB ONLY) =================
-      await sendNotification({
-        title: "SocialGist",
-        body: alreadyLiked
-          ? "You removed a like"
-          : "You liked a post!",
+      const likesMap = {};
+
+      (data || []).forEach((like) => {
+        likesMap[like.post_id] = true;
       });
 
-      // ================= DEBUG =================
-      console.log("LIKE UPDATED:", newLikes);
+      // ✅ ONLY sync liked posts from DB (DO NOT touch animations)
+      setLikedPosts(likesMap);
+
+      console.log("LIKES LOADED:", likesMap);
     } catch (err) {
-      console.log("LIKE ERROR:", err);
+      console.log("LOAD LIKES EXCEPTION:", err);
     }
   };
 
 
+  // ================= INIT ON LOGIN =================
+  useEffect(() => {
+    if (me?.id) {
+      loadUserLikes(me.id);
+    }
+  }, [me?.id]);
+
+
+  const likePost = async (postId) => {
+    if (!me?.id || !postId) return;
+
+    try {
+      // prevent spam clicks
+      if (animatingLike === postId) return;
+
+      setAnimatingLike(postId);
+      setTimeout(() => setAnimatingLike(null), 350);
+
+      const isLiked = !!likedPosts[postId];
+
+      // ================= OPTIMISTIC UI =================
+      setLikedPosts((prev) => ({
+        ...prev,
+        [postId]: !isLiked,
+      }));
+
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.id === postId
+            ? {
+              ...post,
+              likes_count: Math.max(
+                0,
+                (post.likes_count || 0) + (isLiked ? -1 : 1)
+              ),
+            }
+            : post
+        )
+      );
+
+      // ================= DATABASE SYNC =================
+      if (isLiked) {
+        // UNLIKE
+        const { error } = await supabase
+          .from("likes")
+          .delete()
+          .eq("user_id", me.id)
+          .eq("post_id", postId);
+
+        if (error) {
+          console.log("UNLIKE ERROR:", error);
+
+          // rollback UI
+          setLikedPosts((prev) => ({
+            ...prev,
+            [postId]: true,
+          }));
+
+          setPosts((prev) =>
+            prev.map((post) =>
+              post.id === postId
+                ? {
+                  ...post,
+                  likes_count: (post.likes_count || 1) + 1,
+                }
+                : post
+            )
+          );
+        }
+      } else {
+        // LIKE
+        const { error } = await supabase.from("likes").insert({
+          user_id: me.id,
+          post_id: postId,
+        });
+
+        if (error) {
+          console.log("LIKE ERROR:", error);
+
+          // rollback UI
+          setLikedPosts((prev) => ({
+            ...prev,
+            [postId]: false,
+          }));
+
+          setPosts((prev) =>
+            prev.map((post) =>
+              post.id === postId
+                ? {
+                  ...post,
+                  likes_count: Math.max(0, (post.likes_count || 0) - 1),
+                }
+                : post
+            )
+          );
+        }
+      }
+
+      console.log("LIKE TOGGLED:", postId);
+    } catch (err) {
+      console.log("LIKE POST ERROR:", err);
+    }
+  };
   // ================= SHARE (WEB ONLY) =================
 
   const sharePost = async (post) => {
@@ -1155,8 +1205,6 @@ export default function Feed({
           const parsed =
             post.content || {};
 
-          console.log(post)
-
 
           return (
             <div
@@ -1335,7 +1383,7 @@ export default function Feed({
                       <Heart
                         size={25}
                         className="text-red-500"
-                        fill="currentcolor"
+                        fill={likedPosts[post.id] ? "currentColor" : "none"}
                       />
                       <span className="text-sm text-gray-600 dark:text-gray-300 font-medium">
                         {post.likes_count || 0}

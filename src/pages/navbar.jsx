@@ -110,6 +110,7 @@ export default function TopNavbar({
   const [showCategory, setShowCategory] = useState(false);
 
   const [avatar, setAvatar] = useState("");
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const navigate = useNavigate();
 
@@ -373,40 +374,46 @@ export default function TopNavbar({
     });
 
   const uploadImage = async (e) => {
-    const file =
-      e.target.files?.[0];
-
+    const file = e.target.files?.[0];
     if (!file) return;
 
-    const compressed =
-      await compressImage(file);
+    try {
+      // 1. INSTANT PREVIEW (NO WAIT → prevents "hang feel")
+      const previewUrl = URL.createObjectURL(file);
+      setImage(previewUrl);
 
-    setImageFile(compressed);
+      // 2. SHOW LOADING STATE (optional but recommended)
+      setUploadingImage?.(true);
 
-    setImage(
-      URL.createObjectURL(
-        compressed
-      )
-    );
+      console.log(
+        "Original:",
+        (file.size / 1024 / 1024).toFixed(2),
+        "MB"
+      );
 
-    console.log(
-      "Original:",
-      (
-        file.size /
-        1024 /
-        1024
-      ).toFixed(2),
-      "MB"
-    );
+      // 3. COMPRESS IN BACKGROUND (non-blocking UX)
+      const compressed = await compressImage(file);
 
-    console.log(
-      "Compressed:",
-      (
-        compressed.size /
-        1024
-      ).toFixed(0),
-      "KB"
-    );
+      console.log(
+        "Compressed:",
+        (compressed.size / 1024).toFixed(0),
+        "KB"
+      );
+
+      // 4. SET FINAL FILE
+      setImageFile(compressed);
+
+      // 5. REPLACE PREVIEW WITH COMPRESSED VERSION (optional)
+      const finalPreview = URL.createObjectURL(compressed);
+      setImage(finalPreview);
+
+     
+
+    } catch (err) {
+      console.log("Upload error:", err);
+    } finally {
+      setUploadingImage?.(false);
+    }
   };
 
   // ================= ADD TEXT =================
@@ -559,7 +566,7 @@ export default function TopNavbar({
         .eq("id", userId)
         .select(); // optional: returns updated row
 
-        console.log(updatedData)
+      console.log(updatedData)
 
       if (updateError) {
         console.error("Update error:", updateError.message);
@@ -673,39 +680,7 @@ export default function TopNavbar({
         );
       }
 
-      // ================= PAYLOAD =================
 
-      /*     const payload = {
-    
-            user_id:
-              userData.user.id,
-    
-            profile_name:
-              userData.user
-                .user_metadata
-                ?.full_name ||
-              "Anonymous",
-    
-            profile_image:
-              userData.user
-                .user_metadata
-                ?.avatar_url ||
-              "",
-    
-            type: image
-              ? "image_post"
-              : "text_post",
-    
-            description,
-    
-            image:
-              uploadedImage,
-    
-            content: {
-              background,
-              layers,
-            },
-          }; */
 
       const url = await getProfilePicture();
 
@@ -786,6 +761,9 @@ export default function TopNavbar({
       console.log(
         "POST CREATED SUCCESSFULLY"
       );
+
+       setImage(null);
+      setImageFile(null);
 
       if (onPostCreated) {
         onPostCreated();
@@ -1181,7 +1159,7 @@ export default function TopNavbar({
                   e.target.value
                 )
               }
-              placeholder="What's on your mind?"
+              placeholder="Describe your post?"
               rows={2}
               className="w-full bg-transparent text-white placeholder:text-gray-400 outline-none resize-none text-base"
             />

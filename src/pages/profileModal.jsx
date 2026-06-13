@@ -1,9 +1,5 @@
-// ProfileModal.jsx
-
 import React, { useState, useEffect } from "react";
-import {
-  X,
-} from "lucide-react";
+import { X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function ProfileModal({
@@ -12,10 +8,12 @@ export default function ProfileModal({
   profile,
   isFollowing = false,
   onFollowToggle,
-  currentUserId, // 👈 IMPORTANT: pass logged-in user id here
+  currentUserId,
 }) {
   const [imageOpen, setImageOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+
   const navigate = useNavigate();
 
   // ESC CLOSE
@@ -28,12 +26,26 @@ export default function ProfileModal({
     return () => window.removeEventListener("keydown", handleKey);
   }, [onClose]);
 
+  // sync loading state when profile changes
+  useEffect(() => {
+    if (open) {
+      setLoadingProfile(true);
+
+      const t = setTimeout(() => {
+        setLoadingProfile(false);
+      }, 500); // small smooth delay
+
+      return () => clearTimeout(t);
+    }
+  }, [profile, open]);
+
   if (!open) return null;
 
   const username =
     profile?.full_name?.replace(/\s+/g, "").toLowerCase() || "user";
 
-  const isOwnProfile = currentUserId && profile?.id === currentUserId;
+  const isOwnProfile =
+    currentUserId && profile?.id === currentUserId;
 
   return (
     <div className="fixed inset-0 z-[99999] flex items-end justify-center">
@@ -65,11 +77,51 @@ export default function ProfileModal({
         {/* CONTENT */}
         <div className="relative flex-1 overflow-y-auto bg-white rounded-t-[40px] px-6 pt-8 pb-10">
 
-          {!profile ? (
+          {/* ================= SKELETON ================= */}
+          {loadingProfile || !profile ? (
             <div className="animate-pulse">
+
+              {/* AVATAR */}
               <div className="flex justify-center">
                 <div className="w-32 h-32 rounded-full bg-gray-200" />
               </div>
+
+              {/* NAME */}
+              <div className="mt-6 flex justify-center">
+                <div className="h-6 w-48 bg-gray-200 rounded-lg" />
+              </div>
+
+              {/* USERNAME */}
+              <div className="mt-3 flex justify-center">
+                <div className="h-4 w-24 bg-gray-100 rounded-lg" />
+              </div>
+
+              {/* BIO */}
+              <div className="mt-6 space-y-2 flex flex-col items-center">
+                <div className="h-3 w-64 bg-gray-100 rounded" />
+                <div className="h-3 w-56 bg-gray-100 rounded" />
+                <div className="h-3 w-40 bg-gray-100 rounded" />
+              </div>
+
+              {/* STATS */}
+              <div className="grid grid-cols-3 gap-3 mt-8">
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="bg-gray-100 rounded-3xl p-4 text-center space-y-2"
+                  >
+                    <div className="h-6 w-10 mx-auto bg-gray-200 rounded" />
+                    <div className="h-3 w-14 mx-auto bg-gray-200 rounded" />
+                  </div>
+                ))}
+              </div>
+
+              {/* BUTTONS */}
+              <div className="flex gap-3 mt-8">
+                <div className="flex-1 h-14 rounded-2xl bg-gray-200" />
+                <div className="flex-1 h-14 rounded-2xl bg-gray-100" />
+              </div>
+
             </div>
           ) : (
             <>
@@ -135,7 +187,6 @@ export default function ProfileModal({
               {/* BUTTONS */}
               <div className="flex gap-3 mt-8">
 
-                {/* OWN PROFILE */}
                 {isOwnProfile ? (
                   <button
                     onClick={() => navigate(`/profile/${profile.id}`)}
@@ -153,19 +204,17 @@ export default function ProfileModal({
                     </button>
 
                     <button
-                      onClick={() => {
-                        if (!profile?.id) return;
-                        navigate(`/profile/${profile.id}`);
-                      }}
+                      onClick={() => navigate(`/profile/${profile.id}`)}
                       className="flex-1 h-14 rounded-2xl border-2 border-purple-200 text-purple-700 font-semibold"
                     >
                       View Profile
                     </button>
                   </>
                 )}
+
               </div>
 
-              {/* IMAGE MODAL */}
+              {/* IMAGE ZOOM MODAL */}
               {imageOpen && (
                 <div className="fixed inset-0 z-[999999] bg-black flex items-center justify-center">
                   <div
