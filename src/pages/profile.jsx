@@ -222,7 +222,7 @@ export default function ProfilePage({ onBack }) {
         {/* COVER IMAGE */}
         <div className="relative h-56 mx-4 rounded-3xl overflow-hidden">
           <img
-            src="https://images.unsplash.com/photo-1520975916090-3105956dac38?q=80&w=1600"
+            src={profile.avatar_url}
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
