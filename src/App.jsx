@@ -15,6 +15,7 @@ import ProfilePage from "./pages/profile";
 import ProfileModal from "./pages/profileModal";
 import NotificationsPage from "./pages/notifications";
 import PublicProfilePage from "./pages/publicProfile";
+import SinglePost from "./pages/singlepost";
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -126,7 +127,7 @@ export default function App() {
           }
         />
 
-       <Route path="/profile/:id" element={<PublicProfilePage />} />
+        <Route path="/profile/:id" element={<PublicProfilePage />} />
 
         <Route
           path="/profile"
@@ -134,6 +135,8 @@ export default function App() {
             session ? <ProfilePage /> : <Navigate to="/" />
           }
         />
+
+        <Route path="/post/:id" element={<SinglePost />} />
 
         <Route
           path="/profile-modal"

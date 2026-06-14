@@ -16,51 +16,91 @@ export default function ProfilePage({ onBack }) {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+
   // FETCH PROFILE
   useEffect(() => {
     const fetchProfile = async () => {
-      const cached = sessionStorage.getItem("profile");
+      try {
+        setLoading(true);
 
-      if (cached) {
-        setProfile(JSON.parse(cached));
-        setLoading(false);
-        return;
-      }
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      const { data: authData } = await supabase.auth.getUser();
-      const userId = authData?.user?.id;
+        if (!user) {
+          setProfile(null);
+          setLoading(false);
+          return;
+        }
 
-      if (!userId) {
-        setLoading(false);
-        return;
-      }
+        const cacheKey = `profile-${user.id}`;
 
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .single();
+        // Try user-specific cache first
+        const cached = sessionStorage.getItem(cacheKey);
 
-      if (!error && data) {
-        let updated = { ...data };
+        if (cached) {
+          const parsed = JSON.parse(cached);
 
-        if (!updated.username) {
-          updated.username = "user_" + nanoid(6);
+          setProfile(parsed);
+        }
+
+        // Always fetch fresh data from Supabase
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+
+        if (error) {
+          console.error(error);
+          setLoading(false);
+          return;
+        }
+
+        let updatedProfile = { ...data };
+
+        if (!updatedProfile.username) {
+          const username = `user_${nanoid(6)}`;
 
           await supabase
             .from("profiles")
-            .update({ username: updated.username })
-            .eq("id", userId);
+            .update({ username })
+            .eq("id", user.id);
+
+          updatedProfile.username = username;
         }
 
-        setProfile(updated);
-        sessionStorage.setItem("profile", JSON.stringify(updated));
-      }
+        setProfile(updatedProfile);
 
-      setLoading(false);
+        sessionStorage.setItem(
+          cacheKey,
+          JSON.stringify(updatedProfile)
+        );
+
+        console.log("Loaded profile:", updatedProfile);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchProfile();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN") {
+        fetchProfile();
+      }
+
+      if (event === "SIGNED_OUT") {
+        sessionStorage.clear();
+        setProfile(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const updateField = async (field, value) => {
@@ -117,31 +157,55 @@ export default function ProfilePage({ onBack }) {
   };
 
   const uploadAvatar = async (file) => {
-    const { data: authData } = await supabase.auth.getUser();
-    const userId = authData?.user?.id;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    if (!file || !userId) return;
+    if (!file || !user) return;
 
     const compressed = await compressImage(file);
 
-    const fileName = `${userId}/${Date.now()}.jpg`;
+    const fileName = `${user.id}/${Date.now()}.jpg`;
 
-    await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from("profile-images")
-      .upload(fileName, compressed, { upsert: true });
+      .upload(fileName, compressed);
+
+    if (uploadError) {
+      console.error(uploadError);
+      return;
+    }
 
     const { data } = supabase.storage
       .from("profile-images")
       .getPublicUrl(fileName);
 
-    const url = data.publicUrl;
+    const avatarUrl = data.publicUrl;
 
-    setProfile((p) => ({ ...p, avatar_url: url }));
-
-    await supabase
+    const { error: updateError } = await supabase
       .from("profiles")
-      .update({ avatar_url: url })
-      .eq("id", userId);
+      .update({
+        avatar_url: avatarUrl,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", user.id);
+
+    if (updateError) {
+      console.error(updateError);
+      return;
+    }
+
+    const updatedProfile = {
+      ...profile,
+      avatar_url: avatarUrl,
+    };
+
+    setProfile(updatedProfile);
+
+    sessionStorage.setItem(
+      `profile-${user.id}`,
+      JSON.stringify(updatedProfile)
+    );
   };
 
   const regenerateUsername = async () => {
@@ -156,6 +220,9 @@ export default function ProfilePage({ onBack }) {
       </div>
     );
   }
+
+
+  console.log(profile)
 
   if (!profile) {
     return (

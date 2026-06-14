@@ -986,48 +986,64 @@ export default function Feed({
 
   const sharePost = async (post) => {
     try {
+      const shareUrl = `${window.location.origin}/post/${post.id}`;
+
       const caption =
         post.description || "Check this post on SocialGist";
 
-      const shareUrl =
-        `https://socialgist-webapp.vercel.app/post/${post.id}`;
+      const username = `@${(post.profile_name || "user")
+        .replace(/\s+/g, "")
+        .toLowerCase()}`;
 
-      const username =
-        `@${(post.profile_name || "user")
-          .replace(/\s+/g, "")
-          .toLowerCase()}`;
+      // Helper function to increment shares
+      const incrementShares = async () => {
+        const { data, error } = await supabase
+          .from("posts")
+          .select("shares_count")
+          .eq("id", post.id)
+          .single();
 
-      // =========================
-      // 1. NATIVE WEB SHARE API (BEST OPTION)
-      // =========================
+          console.log(data)
+
+        if (error) {
+          console.error("Fetch shares error:", error);
+          return;
+        }
+
+        const newCount = (data.shares_count || 0) + 1;
+
+        const { error: updateError } = await supabase
+          .from("posts")
+          .update({ shares_count: newCount })
+          .eq("id", post.id);
+
+        if (updateError) {
+          console.error("Update shares error:", updateError);
+        }
+      };
+
+      // Native Share API
       if (navigator.share) {
         await navigator.share({
-          title: "SocialGist",
-          text: `${caption} ${username}`,
+          title: `${post.profile_name || "User"} on SocialGist`,
+          text: `${caption}\n\n${username}`,
           url: shareUrl,
         });
 
-        await supabase.rpc("increment_shares", {
-          post_id: post.id,
-        });
+        await incrementShares();
 
         return;
       }
 
-      // =========================
-      // 2. FALLBACK: COPY LINK
-      // =========================
+      // Fallback: copy link
       await navigator.clipboard.writeText(shareUrl);
 
-      // optional: toast UI if you have it
-      console.log("Link copied to clipboard!");
+      alert("Post link copied!");
 
-      await supabase.rpc("increment_shares", {
-        post_id: post.id,
-      });
+      await incrementShares();
 
-    } catch (err) {
-      console.log("Share error:", err);
+    } catch (error) {
+      console.error("Share error:", error);
     }
   };
 

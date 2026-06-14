@@ -298,6 +298,8 @@ export default function TopNavbar({
       .eq("id", userId)
       .single();
 
+    console.log(data)
+
     if (error) {
       console.error(error);
       return null;
@@ -407,7 +409,7 @@ export default function TopNavbar({
       const finalPreview = URL.createObjectURL(compressed);
       setImage(finalPreview);
 
-     
+
 
     } catch (err) {
       console.log("Upload error:", err);
@@ -762,7 +764,7 @@ export default function TopNavbar({
         "POST CREATED SUCCESSFULLY"
       );
 
-       setImage(null);
+      setImage(null);
       setImageFile(null);
 
       if (onPostCreated) {
@@ -1082,6 +1084,7 @@ export default function TopNavbar({
             <button
               onClick={async () => {
                 await supabase.auth.signOut();
+                sessionStorage.clear();
                 window.location.reload();
               }}
               className="w-full flex items-center gap-4 px-5 py-4 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-500 transition"
