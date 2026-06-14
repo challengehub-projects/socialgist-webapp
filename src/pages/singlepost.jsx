@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "../configs/supbase";
-import { MessageCircle, ThumbsUp } from "lucide-react";
+import { MessageCircle, ThumbsUp, Loader2 } from "lucide-react";
 import { BiShare } from "react-icons/bi";
-import { Loader2 } from "lucide-react";
 
 export default function SinglePost() {
   const { id } = useParams();
@@ -19,38 +18,33 @@ export default function SinglePost() {
   const fetchPost = async () => {
     setLoading(true);
 
-    try {
-      const { data: postData, error } = await supabase
-        .from("posts")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
+    const { data: postData } = await supabase
+      .from("posts")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
 
-      if (error || !postData) {
-        setPost(null);
-        setLoading(false);
-        return;
-      }
-
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("id, username, full_name, avatar_url")
-        .eq("id", postData.user_id)
-        .maybeSingle();
-
-      setPost({
-        ...postData,
-        profile: profileData || null,
-      });
-    } catch (err) {
-      console.error(err);
+    if (!postData) {
       setPost(null);
+      setLoading(false);
+      return;
     }
+
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("id, username, full_name, avatar_url")
+      .eq("id", postData.user_id)
+      .maybeSingle();
+
+    setPost({
+      ...postData,
+      profile: profileData || null,
+    });
 
     setLoading(false);
   };
 
-  // ✅ SAFE PARSE (fixes layers issue)
+  // SAFE PARSE
   let parsed = {};
   try {
     parsed =
@@ -61,32 +55,34 @@ export default function SinglePost() {
     parsed = {};
   }
 
+  // 🔥 CLEAN SHARE (WhatsApp + all apps)
   const sharePost = async () => {
     const url = `${window.location.origin}/post/${id}`;
 
-    const text = `${post?.profile?.full_name || "Someone"} posted on SocialGist`;
+    const text =
+      post?.description ||
+      post?.profile?.full_name ||
+      "Check this post on SocialGist";
 
     if (navigator.share) {
-      try {
-        await navigator.share({
-          title: "SocialGist",
-          text,
-          url,
-        });
-      } catch {}
+      await navigator.share({
+        title: "SocialGist",
+        text,
+        url,
+      });
     } else {
       await navigator.clipboard.writeText(url);
       alert("Link copied!");
     }
   };
 
-  // ================= LOADER =================
+  // ================= LOADING UI =================
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0b001a] via-[#1a0033] to-[#2a0066] text-white">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0b001a] via-[#1a0033] to-[#2a0066]">
         <div className="flex flex-col items-center gap-3 animate-pulse">
           <Loader2 className="w-10 h-10 animate-spin text-purple-400" />
-          <p className="text-sm text-purple-200">Loading post...</p>
+          <p className="text-purple-200 text-sm">Loading post...</p>
         </div>
       </div>
     );
@@ -101,20 +97,19 @@ export default function SinglePost() {
   }
 
   return (
-    <div className="min-h-screen flex justify-center bg-gradient-to-br from-[#0b001a] via-[#120022] to-[#2a0066] text-white">
+    <div className="min-h-screen flex justify-center bg-gradient-to-br from-[#0b001a] via-[#120022] to-[#1a0033] text-white">
 
-      <div className="w-full max-w-xl bg-black/40 backdrop-blur-xl min-h-screen">
+      {/* MAIN CARD */}
+      <div className="w-full max-w-xl bg-black/40 backdrop-blur-xl border border-white/10 shadow-2xl">
 
         {/* HEADER */}
         <div className="flex items-center gap-3 p-4 border-b border-white/10">
           <img
             src={
               post.profile?.avatar_url ||
-              `https://ui-avatars.com/api/?name=${
-                post.profile?.full_name || "User"
-              }`
+              `https://ui-avatars.com/api/?name=${post.profile?.full_name || "User"}`
             }
-            className="w-10 h-10 rounded-full object-cover border border-purple-500"
+            className="w-11 h-11 rounded-full object-cover border border-purple-500"
           />
 
           <div>
@@ -129,19 +124,17 @@ export default function SinglePost() {
 
         {/* DESCRIPTION */}
         {post.description && (
-          <div className="px-4 py-3">
-            <p className="text-white whitespace-pre-wrap">
-              {post.description}
-            </p>
+          <div className="px-4 py-3 text-sm text-white/90">
+            {post.description}
           </div>
         )}
 
-        {/* IMAGE + LAYERS (FIXED OVERLAY SYSTEM) */}
+        {/* IMAGE + LAYERS */}
         {post.image && (
-          <div className="relative w-full">
+          <div className="relative w-full overflow-hidden bg-black">
             <img
               src={post.image}
-              className="w-full object-cover max-h-[600px]"
+              className="w-full max-h-[650px] object-cover"
               alt=""
             />
 
@@ -152,11 +145,10 @@ export default function SinglePost() {
                 style={{
                   left: `${layer.x}px`,
                   top: `${layer.y}px`,
-                  color: layer.color || "white",
-                  fontSize: layer.fontSize || "20px",
-                  textShadow: "0 3px 10px rgba(0,0,0,0.8)",
+                  color: layer.color || "#fff",
+                  fontSize: layer.fontSize || "18px",
+                  textShadow: "0 3px 10px rgba(0,0,0,0.9)",
                   whiteSpace: "pre-wrap",
-                  zIndex: 10,
                 }}
               >
                 {layer.text}
@@ -165,51 +157,55 @@ export default function SinglePost() {
           </div>
         )}
 
-        {/* TEXT POST (SOCIALGIST STYLE STATUS) */}
+        {/* TEXT POST */}
         {!post.image && parsed?.text && (
           <div
-            className="min-h-[450px] flex items-center justify-center px-6 text-center"
+            className="min-h-[420px] flex items-center justify-center px-6 text-center"
             style={{
               background:
                 parsed.background ||
-                "linear-gradient(135deg,#6a11cb,#2a0066,#0b001a)",
+                "linear-gradient(135deg,#6a11cb,#1a0033,#0b001a)",
             }}
           >
-            <div className="text-3xl font-bold whitespace-pre-wrap">
+            <div className="text-2xl md:text-3xl font-bold leading-snug">
               {parsed.text}
             </div>
           </div>
         )}
 
         {/* STATS */}
-        <div className="flex justify-between px-4 py-3 text-purple-200 border-t border-white/10">
+        <div className="flex justify-between px-4 py-3 text-purple-200 border-t border-white/10 text-sm">
           <span>❤️ {post.likes_count || 0}</span>
           <span>💬 {post.comments_count || 0}</span>
           <span>🔁 {post.shares_count || 0}</span>
         </div>
 
-        {/* ACTION BAR (TikTok + WhatsApp vibe) */}
+        {/* ACTION BAR (clean + modern) */}
         <div className="flex justify-around items-center py-4 border-t border-white/10">
 
           <button
             onClick={() => setLiked(!liked)}
             className="flex flex-col items-center gap-1"
           >
-            <ThumbsUp size={22} fill={liked ? "white" : "none"} />
-            <span className="text-xs">Like</span>
+            <ThumbsUp
+              size={22}
+              fill={liked ? "#a855f7" : "none"}
+              className="text-purple-400"
+            />
+            <span className="text-xs text-purple-200">Like</span>
           </button>
 
           <button className="flex flex-col items-center gap-1">
-            <MessageCircle size={22} />
-            <span className="text-xs">Comment</span>
+            <MessageCircle size={22} className="text-purple-400" />
+            <span className="text-xs text-purple-200">Comment</span>
           </button>
 
           <button
             onClick={sharePost}
-            className="flex flex-col items-center gap-1 text-purple-300"
+            className="flex flex-col items-center gap-1"
           >
-            <BiShare size={22} />
-            <span className="text-xs">Share</span>
+            <BiShare size={22} className="text-purple-400" />
+            <span className="text-xs text-purple-200">Share</span>
           </button>
 
         </div>

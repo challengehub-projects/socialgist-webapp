@@ -22,6 +22,7 @@ import {
 import { showNotification } from "../utils/notifications";
 import { sendNotification } from "../utils/sendNotifications";
 import ProfileModal from "./profileModal";
+import { toPng } from "html-to-image";
 /* import Share from "@capacitor/share"; */
 
 
@@ -984,69 +985,50 @@ export default function Feed({
   };
   // ================= SHARE (WEB ONLY) =================
 
-  const sharePost = async (post) => {
-    try {
-      const shareUrl = `${window.location.origin}/post/${post.id}`;
+ 
 
-      const caption =
-        post.description || "Check this post on SocialGist";
+const sharePost = async (id) => {
+  try {
+   
 
-      const username = `@${(post.profile_name || "user")
-        .replace(/\s+/g, "")
-        .toLowerCase()}`;
-
-      // Helper function to increment shares
-      const incrementShares = async () => {
-        const { data, error } = await supabase
-          .from("posts")
-          .select("shares_count")
-          .eq("id", post.id)
-          .single();
-
-          console.log(data)
-
-        if (error) {
-          console.error("Fetch shares error:", error);
-          return;
-        }
-
-        const newCount = (data.shares_count || 0) + 1;
-
-        const { error: updateError } = await supabase
-          .from("posts")
-          .update({ shares_count: newCount })
-          .eq("id", post.id);
-
-        if (updateError) {
-          console.error("Update shares error:", updateError);
-        }
-      };
-
-      // Native Share API
-      if (navigator.share) {
-        await navigator.share({
-          title: `${post.profile_name || "User"} on SocialGist`,
-          text: `${caption}\n\n${username}`,
-          url: shareUrl,
-        });
-
-        await incrementShares();
-
-        return;
-      }
-
-      // Fallback: copy link
-      await navigator.clipboard.writeText(shareUrl);
-
-      alert("Post link copied!");
-
-      await incrementShares();
-
-    } catch (error) {
-      console.error("Share error:", error);
+    if (!id) {
+      alert("Post not ready to share");
+      return;
     }
-  };
 
+    // convert post UI → image
+    const dataUrl = await toPng(id, {
+      cacheBust: true,
+      pixelRatio: 2,
+      backgroundColor: "#0b001a",
+    });
+
+    const blob = await (await fetch(dataUrl)).blob();
+    const file = new File([blob], "socialgist-post.png", {
+      type: "image/png",
+    });
+
+    const text = post?.description || "Check this post on SocialGist";
+
+    // WhatsApp / native share
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      await navigator.share({
+        title: "SocialGist",
+        text,
+        files: [file],
+      });
+    } else {
+      // fallback: download image
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = "socialgist-post.png";
+      link.click();
+    }
+  } catch (err) {
+    console.error("Share failed:", err);
+    alert("Could not share post");
+  }
+};
   // ================= LOADING =================
   /* 
     if (loading) {
@@ -1564,7 +1546,7 @@ export default function Feed({
                   <button
                     onClick={() =>
                       sharePost(
-                        post
+                        post.id
                       )
                     }
                     className="flex items-center justify-center gap-2 h-12 rounded-2xl bg-purple-500/10 text-purple-600 active:scale-95 transition"

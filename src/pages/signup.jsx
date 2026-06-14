@@ -25,32 +25,55 @@ export default function SignupPage({ onNavigate }) {
 
   const handleSignup = async (e) => {
     e.preventDefault();
-    setError("");
     setLoading(true);
+    setError("");
 
     try {
-      const isEmail = form.identifier.includes("@");
+      const email = form.identifier;
 
-      const { error } = await supabase.auth.signUp({
-        email: isEmail ? form.identifier : undefined,
+
+      const { data, error: authError } = await supabase.auth.signUp({
+        email,
         password: form.password,
         options: {
           data: {
             full_name: form.displayName,
-            username: isEmail ? null : form.identifier,
           },
         },
       });
 
-      if (error) throw error;
+      if (authError) throw authError;
 
+      const user = data?.user;
+
+      if (!user) {
+        throw new Error("User creation failed");
+      }
+
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .insert({
+          id: user.id,
+          full_name: form.displayName,
+          username: email.split("@")[0],
+        });
+
+      if (profileError) {
+        console.error(profileError);
+        throw profileError;
+      }
+
+      alert("Account created successfully");
       onNavigate("login");
+
     } catch (err) {
-      setError(err.message);
+      console.log(err);
+      setError(err.message || "Signup failed");
     } finally {
       setLoading(false);
     }
   };
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white px-6">
