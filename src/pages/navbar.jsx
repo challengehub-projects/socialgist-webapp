@@ -1443,7 +1443,6 @@ export default function TopNavbar({
               type="file"
               hidden
               accept="image/*"
-              capture="environment"
               onChange={uploadImage}
             />
 
