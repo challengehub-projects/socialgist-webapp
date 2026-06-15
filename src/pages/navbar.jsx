@@ -375,42 +375,93 @@ export default function TopNavbar({
         URL.createObjectURL(file);
     });
 
+  const normalizeImage = (file) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      const reader = new FileReader();
+
+      reader.onload = (e) => (img.src = e.target.result);
+      reader.readAsDataURL(file);
+
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+
+        const MAX_SIZE = 1200;
+
+        let w = img.width;
+        let h = img.height;
+
+        if (w > h && w > MAX_SIZE) {
+          h = (h * MAX_SIZE) / w;
+          w = MAX_SIZE;
+        } else if (h > MAX_SIZE) {
+          w = (w * MAX_SIZE) / h;
+          h = MAX_SIZE;
+        }
+
+        canvas.width = w;
+        canvas.height = h;
+
+        ctx.drawImage(img, 0, 0, w, h);
+
+        canvas.toBlob((blob) => {
+          resolve(
+            new File([blob], file.name.replace(/\..+$/, ".jpg"), {
+              type: "image/jpeg",
+            })
+          );
+        }, "image/jpeg", 0.8);
+      };
+    });
+  };
+
+  
   const uploadImage = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     try {
-      // 1. INSTANT PREVIEW (NO WAIT → prevents "hang feel")
+      // cleanup old preview (IMPORTANT for mobile)
+      if (image?.startsWith("blob:")) {
+        URL.revokeObjectURL(image);
+      }
+
+      // 1. INSTANT PREVIEW (WhatsApp feel)
       const previewUrl = URL.createObjectURL(file);
       setImage(previewUrl);
 
-      // 2. SHOW LOADING STATE (optional but recommended)
+      // 2. SHOW LOADING STATE
       setUploadingImage?.(true);
 
       console.log(
-        "Original:",
+        "Original size:",
         (file.size / 1024 / 1024).toFixed(2),
         "MB"
       );
 
-      // 3. COMPRESS IN BACKGROUND (non-blocking UX)
-      const compressed = await compressImage(file);
+      // 3. FIX MOBILE IMAGE ORIENTATION + HEIC ISSUE
+      const normalizedFile = await normalizeImage(file);
+
+      // 4. COMPRESS (async safe)
+      const compressed = await compressImage(normalizedFile);
 
       console.log(
-        "Compressed:",
+        "Compressed size:",
         (compressed.size / 1024).toFixed(0),
         "KB"
       );
 
-      // 4. SET FINAL FILE
+      // 5. UPDATE FINAL FILE
       setImageFile(compressed);
 
-      // 5. REPLACE PREVIEW WITH COMPRESSED VERSION (optional)
+      // 6. FINAL PREVIEW (replace raw image)
       const finalPreview = URL.createObjectURL(compressed);
+
+      // cleanup previous preview again
+      URL.revokeObjectURL(previewUrl);
+
       setImage(finalPreview);
-
-
-
     } catch (err) {
       console.log("Upload error:", err);
     } finally {
@@ -1061,6 +1112,7 @@ export default function TopNavbar({
             <button
               onClick={() => {
                 setShowProfileMenu(false);
+                navigate("/settings")
               }}
               className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-100 dark:hover:bg-white/5 transition dark:text-white"
             >

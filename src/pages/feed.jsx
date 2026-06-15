@@ -17,12 +17,15 @@ import {
   CornerUpRight,
   CornerUpLeftIcon,
   MessageSquare,
-  HeartHandshake
+  HeartHandshake,
+  Globe,
+  MoreVertical
 } from "lucide-react";
 import { showNotification } from "../utils/notifications";
 import { sendNotification } from "../utils/sendNotifications";
 import ProfileModal from "./profileModal";
 import { toPng } from "html-to-image";
+import { data } from "react-router-dom";
 /* import Share from "@capacitor/share"; */
 
 
@@ -76,6 +79,7 @@ export default function Feed({
   const [activePost, setActivePost] = useState(null);
 
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [profileId, setProfileId] = useState(null)
   const [followingIds, setFollowingIds] = useState([]);
 
   const [profileOpen, setProfileOpen] = useState(false);
@@ -112,70 +116,79 @@ export default function Feed({
     try {
       const isFollowing = followingIds.includes(profile.id);
 
-      // =========================
-      // UNFOLLOW
-      // =========================
+      // ================= UNFOLLOW =================
       if (isFollowing) {
         setFollowingIds((prev) =>
           prev.filter((id) => id !== profile.id)
         );
 
-        const { error } = await supabase
-          .from("follows")
-          .delete()
-          .match({
-            follower_id: me.id,
-            following_id: profile.id,
-          });
-
-        if (error) throw error;
-
-        // update counts (DB)
-        await supabase.rpc("decrement_follow_counts", {
-          follower_id_input: me.id,
-          following_id_input: profile.id,
-        });
-
-        // OPTIONAL: update UI profile instantly
         setProfileData((prev) => ({
           ...prev,
+          isFollowing: false,
           followers_count: Math.max(
             (prev?.followers_count || 0) - 1,
             0
           ),
         }));
 
+        // decrease target user's followers
+        await supabase
+          .from("profiles")
+          .update({
+            followers_count: Math.max(
+              (profile.followers_count || 0) - 1,
+              0
+            ),
+          })
+        console.log("user count decresed")
+          .eq("id", profile.id);
+
+        // decrease my following count
+        await supabase
+          .from("profiles")
+          .update({
+            following_count: Math.max(
+              (me.following_count || 0) - 1,
+              0
+            ),
+          })
+          .eq("id", me.id);
+
+        console.log("my count decreesed")
         return;
       }
 
-      // =========================
-      // FOLLOW
-      // =========================
+      // ================= FOLLOW =================
       setFollowingIds((prev) => [...prev, profile.id]);
 
-      const { error } = await supabase.from("follows").insert({
-        follower_id: me.id,
-        following_id: profile.id,
-      });
-
-      if (error?.code === "23505") {
-        console.log("Already following");
-        return;
-      }
-
-      if (error) throw error;
-
-      // update counts (DB)
-      await supabase.rpc("increment_follow_counts", {
-        follower_id_input: me.id,
-        following_id_input: profile.id,
-      });
-
-      // OPTIONAL: update UI instantly
       setProfileData((prev) => ({
         ...prev,
+        isFollowing: true,
         followers_count: (prev?.followers_count || 0) + 1,
       }));
+
+      // increase target user's followers
+      await supabase
+        .from("profiles")
+        .update({
+          followers_count:
+            (profile.followers_count || 0) + 1,
+        })
+        .eq("id", profile.id);
+
+      console.log("user increased")
+
+      // increase my following count
+      await supabase
+        .from("profiles")
+        .update({
+          following_count:
+            (me.following_count || 0) + 1,
+        })
+        .eq("id", me.id);
+
+      console.log("mine incread")
+
     } catch (err) {
       console.error("Follow toggle error:", err.message);
     }
@@ -243,32 +256,13 @@ export default function Feed({
     fetchPosts(true);
   }, [activeTab]);
 
-  /*   const openProfileModal = async (userId) => {
-      try {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", userId)
-          .single();
-  
-        if (error) throw error;
-  
-        setSelectedProfile(data);
-        setProfileModalOpen(true);
-  
-      } catch (err) {
-        console.log("Profile load error:", err);
-      }
-    }; */
-
-
 
 
 
   const openUserProfile = async (userId) => {
     try {
       setProfileOpen(true);
-      setProfileData(null); // triggers loading state in modal if you want
+      /*   setProfileData(null); */
 
       const { data, error } = await supabase
         .from("profiles")
@@ -276,20 +270,20 @@ export default function Feed({
         .eq("id", userId)
         .single();
 
-      console.log(data)
-
-      setProfileData({
-        ...data,
-        viewer_id: me?.id
-      });
-
       if (error) throw error;
 
-      setProfileData(data);
+      const enriched = {
+        ...data,
+        viewer_id: me?.id,
+        isFollowing: followingIds.includes(userId),
+      };
+
+      setProfileData(enriched);
     } catch (err) {
       console.log("Profile load error:", err);
     }
   };
+
 
   useEffect(() => {
     if (!activePost?.id) return;
@@ -327,7 +321,7 @@ export default function Feed({
 
 
   const getUserProfile = async (userId) => {
-    if (!userId) return null;
+    if (!userId || !me?.id) return null;
 
     try {
       const { data, error } = await supabase
@@ -338,21 +332,33 @@ export default function Feed({
 
       if (error) throw error;
 
-      return data;
+      // 🔥 fallback: determine follow state from local memory (NOT DB table)
+      const isFollowing =
+        followingIds?.includes(userId) || false;
+
+      const enrichedProfile = {
+        ...data,
+        isFollowing,
+        viewer_id: me.id,
+      };
+
+      return enrichedProfile;
     } catch (err) {
       console.error("Profile fetch error:", err.message);
       return null;
     }
   };
 
-
   useEffect(() => {
     const loadProfile = async () => {
       const profile = await getUserProfile(me?.id);
+      setProfileId(profile.id)
       console.log(profile);
     };
 
-    if (me?.id) loadProfile();
+    if (me?.id)
+      loadProfile();
+
   }, [me?.id]);
 
 
@@ -985,50 +991,50 @@ export default function Feed({
   };
   // ================= SHARE (WEB ONLY) =================
 
- 
 
-const sharePost = async (id) => {
-  try {
-   
 
-    if (!id) {
-      alert("Post not ready to share");
-      return;
-    }
+  const sharePost = async (id) => {
+    try {
 
-    // convert post UI → image
-    const dataUrl = await toPng(id, {
-      cacheBust: true,
-      pixelRatio: 2,
-      backgroundColor: "#0b001a",
-    });
 
-    const blob = await (await fetch(dataUrl)).blob();
-    const file = new File([blob], "socialgist-post.png", {
-      type: "image/png",
-    });
+      if (!id) {
+        alert("Post not ready to share");
+        return;
+      }
 
-    const text = post?.description || "Check this post on SocialGist";
-
-    // WhatsApp / native share
-    if (navigator.share && navigator.canShare?.({ files: [file] })) {
-      await navigator.share({
-        title: "SocialGist",
-        text,
-        files: [file],
+      // convert post UI → image
+      const dataUrl = await toPng(id, {
+        cacheBust: true,
+        pixelRatio: 2,
+        backgroundColor: "#0b001a",
       });
-    } else {
-      // fallback: download image
-      const link = document.createElement("a");
-      link.href = dataUrl;
-      link.download = "socialgist-post.png";
-      link.click();
+
+      const blob = await (await fetch(dataUrl)).blob();
+      const file = new File([blob], "socialgist-post.png", {
+        type: "image/png",
+      });
+
+      const text = post?.description || "Check this post on SocialGist";
+
+      // WhatsApp / native share
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          title: "SocialGist",
+          text,
+          files: [file],
+        });
+      } else {
+        // fallback: download image
+        const link = document.createElement("a");
+        link.href = dataUrl;
+        link.download = "socialgist-post.png";
+        link.click();
+      }
+    } catch (err) {
+      console.error("Share failed:", err);
+      alert("Could not share post");
     }
-  } catch (err) {
-    console.error("Share failed:", err);
-    alert("Could not share post");
-  }
-};
+  };
   // ================= LOADING =================
   /* 
     if (loading) {
@@ -1266,49 +1272,29 @@ const sharePost = async (id) => {
         )}
 
         {/* POSTS */}
-
         {posts.map((post) => {
-          const parsed =
-            post.content || {};
-
+          const parsed = post.content || {};
 
           return (
             <div
               key={post.id}
-              className="bg-white/80 dark:bg-[#18191A] mb-4 sm:rounded-3xl overflow-hidden shadow-sm border border-gray-100 dark:border-white/5"
+              className="bg-white dark:bg-[#18191A] mb-4 sm:rounded-3xl overflow-hidden border border-gray-100 dark:border-white/5 shadow-sm hover:shadow-md transition"
             >
-              {/* HEADER */}
-              <div className="flex items-center gap-3 px-4 py-4">
+
+              {/* ================= HEADER ================= */}
+              <div className="flex items-center gap-3 px-4 py-4 relative">
 
                 {/* AVATAR */}
                 {post.profile_image ? (
                   <img
                     src={profileImages[post.user_id]}
-                    alt={post.profile_name || "User"}
-                    /*   onClick={() =>
-                        openProfileModal({
-                          profile_name: post.profile_name || "Anonymous",
-                          profile_image: post.profile_image,
-                          bio: post.bio || "Connect • Vibe • Gist",
-                          posts: posts?.length || 0,
-                        })
-                      } */
-
                     onClick={() => openUserProfile(post.user_id)}
-                    className="h-12 w-12 rounded-full object-cover ring-2 ring-purple-800 active:scale-95 transition cursor-pointer"
+                    className="h-12 w-12 rounded-full object-cover ring-2 ring-purple-500 cursor-pointer active:scale-95 transition"
                   />
                 ) : (
                   <div
-                    /*   onClick={() =>
-                        openUserProfile({
-                          profile_name: post.profile_name || "Anonymous",
-                          profile_image: null,
-                          bio: post.bio || "Connect • Vibe • Gist",
-                          posts: posts?.length || 0,
-                        })
-                      } */
                     onClick={() => openUserProfile(post.user_id)}
-                    className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-fuchsia-500 flex items-center justify-center text-white font-bold text-sm ring-2 ring-purple-500 active:scale-95 transition cursor-pointer"
+                    className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-fuchsia-500 flex items-center justify-center text-white font-bold text-sm cursor-pointer"
                   >
                     {(post.profile_name || "U").charAt(0).toUpperCase()}
                   </div>
@@ -1317,61 +1303,47 @@ const sharePost = async (id) => {
                 {/* USER INFO */}
                 <div className="flex-1">
                   <h3
-                    /*   onClick={() =>
-                        openUserProfile({
-                          profile_name: post.profile_name || "Anonymous",
-                          profile_image: post.profile_image || null,
-                          bio: post.bio || "Connect • Vibe • Gist",
-                          posts: posts?.length || 0,
-                        })
-                      } */
                     onClick={() => openUserProfile(post.user_id)}
-                    className="font-semibold text-sm text-purple-900 dark:text-purple-400 cursor-pointer hover:underline active:scale-95 transition"
+                    className="font-semibold text-sm text-gray-900 dark:text-white cursor-pointer"
                   >
                     {post.profile_name || "Anonymous"}
                   </h3>
 
-                  <p className="text-xs text-gray-500">
-                    {post.created_at
-                      ? formatTimeAgo(post.created_at)
-                      : "Just now"}
+                  <p className="text-xs text-gray-500 flex items-center gap-1">
+                    <Globe size={12} className="text-gray-400" />
+                    {post.created_at ? formatTimeAgo(post.created_at) : "Just now"}
                   </p>
                 </div>
+
+                {/* 3 DOTS MENU (SAFE ADDITION) */}
+                <button className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/5">
+                  <MoreVertical size={18} className="text-gray-600 dark:text-gray-300" />
+                </button>
+
               </div>
 
-              {/* DESCRIPTION */}
+              {/* ================= DESCRIPTION ================= */}
+              {post.description && (
+                <div className="px-4 pb-3">
+                  <p className="text-[15px] leading-relaxed text-gray-800 dark:text-gray-100 whitespace-pre-wrap">
+                    {post.description}
+                  </p>
+                </div>
+              )}
 
-              {
-                post.description && (
-                  <div className="px-4 pb-4">
-                    <p className="text-[15px] leading-relaxed text-gray-800 dark:text-gray-100 whitespace-pre-wrap">
-                      {
-                        post.description
-                      }
-                    </p>
-                  </div>
-                )
-              }
-
-              {/* IMAGE / MEDIA */}
+              {/* ================= IMAGE POST ================= */}
               {post.image && (
                 <div className="relative w-full bg-black overflow-hidden">
 
-                  {/* IMAGE */}
                   <img
                     src={post.cached_image || post.image}
-                    alt=""
-                    className="w-full h-auto object-cover"
-                    style={{
-                      maxHeight: "none", // remove limit
-                    }}
+                    className="w-full object-cover"
                   />
 
-                  {/* TEXT LAYERS */}
                   {parsed?.layers?.map((layer) => (
                     <div
                       key={layer.id}
-                      className="absolute px-2 py-1 font-bold break-words max-w-[90%]"
+                      className="absolute px-2 py-1 font-bold"
                       style={{
                         left: layer.x,
                         top: layer.y,
@@ -1388,130 +1360,91 @@ const sharePost = async (id) => {
                 </div>
               )}
 
-              {/* TEXT ONLY POST */}
+              {/* ================= TEXT POST ================= */}
               {!post.image && parsed?.background && (
                 <div
-                  className="relative w-full min-h-[400px] flex items-center justify-center px-6 py-12 overflow-hidden"
-                  style={{
-                    background: parsed.background,
-                    width: "100%",
-                  }}
+                  className="relative w-full min-h-[380px] flex items-center justify-center px-6 py-12"
+                  style={{ background: parsed.background }}
                 >
-
-                  {/* CENTER TEXT */}
-                  {parsed?.text && (
-                    <div
-                      className="text-white text-center font-extrabold text-3xl sm:text-4xl leading-snug whitespace-pre-wrap break-words max-w-[95%]"
-                    >
+                  {parsed?.text ? (
+                    <div className="text-white text-center font-extrabold text-3xl leading-snug max-w-[90%]">
                       {parsed.text}
                     </div>
-                  )}
-
-                  {/* LAYER MODE */}
-                  {!parsed?.text &&
+                  ) : (
                     parsed?.layers?.map((layer) => (
                       <div
                         key={layer.id}
-                        className="absolute px-2 py-1 font-bold break-words max-w-[90%]"
+                        className="absolute px-2 py-1 font-bold"
                         style={{
                           left: layer.x,
                           top: layer.y,
                           color: layer.color,
                           fontSize: layer.fontSize,
                           textShadow: "0 2px 6px rgba(0,0,0,0.6)",
-                          whiteSpace: "pre-wrap",
                         }}
                       >
                         {layer.text}
                       </div>
-                    ))}
+                    ))
+                  )}
                 </div>
               )}
-              {/* ACTIONS */}
 
+              {/* ================= ACTION BAR ================= */}
               <div className="px-4 py-3">
+
                 {/* COUNTS */}
-
-
-
                 <div className="flex items-center justify-between mb-3">
 
-                  {/* LEFT COUNTS */}
                   <div className="flex items-center gap-5">
 
-                    {/* LIKES (with icon) */}
+                    {/* LIKES (UNCHANGED LOGIC SAFE) */}
                     <div className="flex items-center gap-1">
                       <Heart
-                        size={25}
+                        size={20}
                         className="text-red-500"
-                        fill="CurrentColor"
+                        fill="currentColor"
                       />
-                      <span className="text-sm text-gray-600 dark:text-gray-300 font-medium">
+                      <span className="text-sm text-gray-600 dark:text-gray-300">
                         {post.likes_count || 0}
                       </span>
                     </div>
 
-                    {/* COMMENTS (no icon) */}
-                    <div className="flex items-center gap-1">
-                      <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                    <div className="text-sm text-gray-600 dark:text-gray-300">
+                      <span className="font-semibold text-gray-900 dark:text-white">
                         {post.comments_count || 0}
-                      </span>
-                      <span className="text-sm text-gray-600 dark:text-gray-300 font-medium">
-                        comments
-                      </span>
+                      </span>{" "}
+                      comments
                     </div>
 
-                    {/* SHARES (no icon) */}
-                    <div className="flex items-center gap-1">
-                      <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                    <div className="text-sm text-gray-600 dark:text-gray-300">
+                      <span className="font-semibold text-gray-900 dark:text-white">
                         {post.shares_count || 0}
-                      </span>
-                      <span className="text-sm text-gray-600 dark:text-gray-300 font-medium">
-                        shares
-                      </span>
+                      </span>{" "}
+                      shares
                     </div>
 
                   </div>
 
-                  {/* APP NAME RIGHT */}
                   <div className="text-xs font-semibold text-purple-600">
                     SocialGist
                   </div>
-
                 </div>
 
-                {/* BUTTONS */}
-
+                {/* BUTTONS (NO TOUCH TO LIKE SYSTEM) */}
                 <div className="grid grid-cols-3 gap-2 border-t border-gray-100 dark:border-white/5 pt-3">
-                  {/* LIKE */}
-
                   <button
-                    onClick={() =>
-                      likePost(
-                        post.id
-                      )
-                    }
-                    className={`flex items-center justify-center gap-2 h-12 rounded-2xl transition-all active:scale-95 ${likedPosts[
-                      post.id
-                    ]
-                      ? "bg-blue-500/10 text-blue-500"
-                      : "hover:bg-gray-100 dark:hover:bg-white/5 text-gray-700 dark:text-gray-200"
+                    onClick={() => likePost(post.id)}
+                    className={`flex items-center justify-center gap-2 h-11 rounded-2xl transition-all active:scale-95 ${likedPosts?.[post.id]
+                        ? "text-blue-500 bg-blue-500/10"
+                        : "hover:bg-gray-100 dark:hover:bg-white/5 text-gray-700 dark:text-gray-200"
                       }`}
                   >
                     <ThumbsUp
-                      size={20}
-                      className={`transition-all ${animatingLike ===
-                        post.id
-                        ? "scale-150 rotate-12"
-                        : ""
+                      size={18}
+                      className={`transition-all duration-200 ${animatingLike === post.id ? "scale-150 rotate-12 text-blue-500" : ""
                         }`}
-                      fill={
-                        likedPosts[
-                          post.id
-                        ]
-                          ? "currentColor"
-                          : "none"
-                      }
+                      fill={likedPosts?.[post.id] ? "currentColor" : "none"}
                     />
 
                     <span className="text-sm font-semibold">
@@ -1519,45 +1452,29 @@ const sharePost = async (id) => {
                     </span>
                   </button>
 
-                  {/* MESSAGE */}
-
                   <button
                     onClick={() => {
-                      openComments(post)
+                      openComments(post);
                       setActivePost(post);
                       setComments(post.comments || []);
                       setOpen(true);
                     }}
-                    className="flex items-center justify-center gap-2 h-12 rounded-2xl hover:bg-gray-100 dark:hover:bg-white/5 text-gray-700 dark:text-gray-200 active:scale-95 transition"
+                    className="flex items-center justify-center gap-2 h-11 rounded-2xl hover:bg-gray-100 dark:hover:bg-white/5"
                   >
-                    <MessageCircle
-                      size={20}
-                    />
-
-                    <span className="text-sm font-semibold">
-                      Comment
-                    </span>
+                    <MessageCircle size={18} />
+                    Comment
                   </button>
-
-
-
-                  {/* SHARE */}
 
                   <button
-                    onClick={() =>
-                      sharePost(
-                        post.id
-                      )
-                    }
-                    className="flex items-center justify-center gap-2 h-12 rounded-2xl bg-purple-500/10 text-purple-600 active:scale-95 transition"
+                    onClick={() => sharePost(post.id)}
+                    className="flex items-center justify-center gap-2 h-11 rounded-2xl bg-purple-500/10 text-purple-600"
                   >
-                    <BiShare size={20} className="w-6 h-6 rotate-180" />
-
-                    <span className="text-sm font-semibold">
-                      Share
-                    </span>
+                    <BiShare size={18} className="rotate-180" />
+                    Share
                   </button>
+
                 </div>
+
               </div>
             </div>
           );
@@ -1776,6 +1693,7 @@ const sharePost = async (id) => {
         profile={profileData}
         isFollowing={profileData ? followingIds.includes(profileData.id) : false}
         onFollowToggle={toggleFollow}
+        currentUserProfileId={profileId}
       />
 
     </div >

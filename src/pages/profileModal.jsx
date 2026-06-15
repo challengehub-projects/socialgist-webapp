@@ -1,22 +1,21 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, X } from "lucide-react";
+import { X, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function ProfileModal({
   open,
   onClose,
   profile,
-  isFollowing = false,
+  isFollowing,
   onFollowToggle,
-  currentUserId,
+  currentUserProfileId,
 }) {
   const [imageOpen, setImageOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
 
+
   // ✅ LOCAL UI STATE (IMPORTANT FIX)
-  const [followersCount, setFollowersCount] = useState(
-    profile?.followers_count || 0
-  );
+  const [followersCount, setFollowersCount] = useState(0);
 
   const navigate = useNavigate();
 
@@ -24,7 +23,10 @@ export default function ProfileModal({
     profile?.full_name?.replace(/\s+/g, "").toLowerCase() || "user";
 
   const isOwnProfile =
-    currentUserId && profile?.id === currentUserId;
+    currentUserProfileId && profile?.id === currentUserProfileId;
+
+  console.log(currentUserProfileId, profile?.id)
+  console.log(profile)
 
   // ================= ESC CLOSE =================
   useEffect(() => {
@@ -120,7 +122,7 @@ export default function ProfileModal({
 
             <div className="bg-purple-50 rounded-3xl p-4 text-center">
               <div className="font-bold text-2xl text-purple-700">
-                {followersCount}
+                {profile?.followers_count}
               </div>
               <div className="text-sm text-gray-500">Followers</div>
             </div>
@@ -153,12 +155,18 @@ export default function ProfileModal({
 
                     // ✅ instant UI update (NO refresh)
                     setFollowersCount((prev) =>
-                      willFollow ? prev + 1 : Math.max(0, prev - 1)
+                      willFollow
+                        ? prev + 1
+                        : Math.max(prev - 1, 0)
                     );
 
-                    onFollowToggle?.(profile);
+                     onFollowToggle?.(profile);
+
                   }}
-                  className="flex-1 h-14 rounded-2xl bg-purple-600 text-white font-semibold"
+                  className={`flex-1 h-14 rounded-2xl font-semibold ${isFollowing
+                      ? "bg-gray-200 text-gray-800"
+                      : "bg-purple-600 text-white"
+                    }`}
                 >
                   {isFollowing ? "Following" : "Follow"}
                 </button>
@@ -185,15 +193,26 @@ export default function ProfileModal({
               />
 
               {/* TOP BAR (WhatsApp style) */}
-              <div className="absolute top-0 left-0 right-0 flex items-center p-4 z-10">
+              <div className="absolute top-0 left-0 right-0 flex items-center gap-3 p-4 z-10 bg-gradient-to-b from-black/60 to-transparent">
+
                 <button
                   onClick={() => setImageOpen(false)}
                   className="flex items-center justify-center w-10 h-10 rounded-full bg-black/40 text-white"
                 >
                   <ArrowLeft size={20} />
                 </button>
-              </div>
 
+                <div className="text-white">
+                  <p className="font-semibold text-sm">
+                    {profile?.full_name || "User"}
+                  </p>
+
+                  <p className="text-xs text-white/70">
+                    @{username}
+                  </p>
+                </div>
+
+              </div>
               {/* IMAGE */}
               <img
                 src={profile?.avatar_url}
@@ -209,3 +228,44 @@ export default function ProfileModal({
     </div>
   );
 }
+/* 
+{profile?.isOwnProfile ? (
+  <button
+    onClick={() => navigate(`/profile/${profile.id}`)}
+    className="flex-1 h-14 rounded-2xl bg-purple-600 text-white font-semibold"
+  >
+    View Profile
+  </button>
+) : (
+  <>
+    <button
+      onClick={async () => {
+        const willFollow = !isFollowing;
+
+        setIsFollowing(willFollow);
+
+        setFollowersCount((prev) =>
+          willFollow
+            ? prev + 1
+            : Math.max(prev - 1, 0)
+        );
+
+        await onFollowToggle?.(profile);
+      }}
+      className={`flex-1 h-14 rounded-2xl font-semibold ${
+        isFollowing
+          ? "bg-gray-200 text-gray-800"
+          : "bg-purple-600 text-white"
+      }`}
+    >
+      {isFollowing ? "Following" : "Follow"}
+    </button>
+
+    <button
+      onClick={() => navigate(`/profile/${profile.id}`)}
+      className="flex-1 h-14 rounded-2xl border-2 border-purple-200 text-purple-700 font-semibold"
+    >
+      View Profile
+    </button>
+  </>
+)} */

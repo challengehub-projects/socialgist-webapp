@@ -16,6 +16,7 @@ import ProfileModal from "./pages/profileModal";
 import NotificationsPage from "./pages/notifications";
 import PublicProfilePage from "./pages/publicProfile";
 import SinglePost from "./pages/singlepost";
+import SettingsPage from "./pages/settings";
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -133,6 +134,14 @@ export default function App() {
           path="/profile"
           element={
             session ? <ProfilePage /> : <Navigate to="/" />
+          }
+        />
+
+
+         <Route
+          path="/settings"
+          element={
+            session ? <SettingsPage /> : <Navigate to="/" />
           }
         />
 

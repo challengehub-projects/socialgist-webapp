@@ -157,51 +157,57 @@ export default function PublicProfilePage() {
 
         </div>
 
-        {/* ================= ABOUT SECTION ================= */}
-        <div className="bg-white rounded-2xl shadow-sm p-6 mt-4">
+        <div className="space-y-3 text-sm text-gray-700">
 
-          <h2 className="text-lg font-semibold mb-4">About</h2>
+          {!profile.location &&
+            !profile.school &&
+            !profile.department &&
+            !profile.relationship_status &&
+            !profile.website ? (
+            <p className="text-center text-gray-400 italic py-4">
+              No information added yet.
+            </p>
+          ) : (
+            <>
+              {profile.location && (
+                <div className="flex justify-between border-b pb-2">
+                  <span className="text-gray-500">📍 Location</span>
+                  <span>{profile.location}</span>
+                </div>
+              )}
 
-          <div className="space-y-3 text-sm text-gray-700">
+              {profile.school && (
+                <div className="flex justify-between border-b pb-2">
+                  <span className="text-gray-500">🎓 School</span>
+                  <span>{profile.school}</span>
+                </div>
+              )}
 
-            {profile.location && (
-              <div className="flex justify-between border-b pb-2">
-                <span className="text-gray-500">📍 Location</span>
-                <span>{profile.location}</span>
-              </div>
-            )}
+              {profile.department && (
+                <div className="flex justify-between border-b pb-2">
+                  <span className="text-gray-500">🏫 Department</span>
+                  <span>{profile.department}</span>
+                </div>
+              )}
 
-            {profile.school && (
-              <div className="flex justify-between border-b pb-2">
-                <span className="text-gray-500">🎓 School</span>
-                <span>{profile.school}</span>
-              </div>
-            )}
+              {profile.relationship_status && (
+                <div className="flex justify-between border-b pb-2">
+                  <span className="text-gray-500">❤️ Relationship</span>
+                  <span>{profile.relationship_status}</span>
+                </div>
+              )}
 
-            {profile.department && (
-              <div className="flex justify-between border-b pb-2">
-                <span className="text-gray-500">🏫 Department</span>
-                <span>{profile.department}</span>
-              </div>
-            )}
+              {profile.website && (
+                <div className="flex justify-between border-b pb-2">
+                  <span className="text-gray-500">🌐 Website</span>
+                  <span className="text-blue-600">
+                    {profile.website}
+                  </span>
+                </div>
+              )}
+            </>
+          )}
 
-            {profile.relationship_status && (
-              <div className="flex justify-between border-b pb-2">
-                <span className="text-gray-500">❤️ Relationship</span>
-                <span>{profile.relationship_status}</span>
-              </div>
-            )}
-
-            {profile.website && (
-              <div className="flex justify-between border-b pb-2">
-                <span className="text-gray-500">🌐 Website</span>
-                <span className="text-blue-600">
-                  {profile.website}
-                </span>
-              </div>
-            )}
-
-          </div>
         </div>
 
       </div>

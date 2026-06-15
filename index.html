@@ -1,25 +1,28 @@
 <!doctype html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="./public/icon.png" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+   <link rel="icon" type="image/svg+xml" href="logo.jpg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SocialGist</title>
 </head>
 
 <body>
   <div id="root"></div>
-  <script type="module" src="/src/main.jsx"></script>
+
   <script type="module" src="/public/index.js"></script>
-</body>
-<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-<script>
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-  OneSignalDeferred.push(async function(OneSignal) {
-    await OneSignal.init({
-      appId: "e984113d-f3be-4e8a-8cc4-928f4fb48b62",
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+
+  <script>
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+
+    OneSignalDeferred.push(async function (OneSignal) {
+      await OneSignal.init({
+        appId: "e984113d-f3be-4e8a-8cc4-928f4fb48b62",
+      });
     });
-  });
-</script>
+  </script>
+
+  <script type="module" src="/src/main.jsx"></script>
+</body>
 </html>
