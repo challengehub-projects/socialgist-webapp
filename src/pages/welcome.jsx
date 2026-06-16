@@ -74,7 +74,7 @@ return ( <div className="relative min-h-screen overflow-hidden bg-white">
       <div className="flex items-center gap-3">
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-600 shadow-lg">
           <img
-            src="/icon.png"
+            src="/logo.jpg"
             alt="SocialGist"
             className="h-7 w-7 object-contain"
           />

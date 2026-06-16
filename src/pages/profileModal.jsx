@@ -13,7 +13,6 @@ export default function ProfileModal({
   const [imageOpen, setImageOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
 
-
   // ✅ LOCAL UI STATE (IMPORTANT FIX)
   const [followersCount, setFollowersCount] = useState(0);
 
@@ -26,7 +25,6 @@ export default function ProfileModal({
     currentUserProfileId && profile?.id === currentUserProfileId;
 
   console.log(currentUserProfileId, profile?.id)
-  console.log(profile)
 
   // ================= ESC CLOSE =================
   useEffect(() => {
@@ -39,43 +37,57 @@ export default function ProfileModal({
   }, [onClose]);
 
   // ================= SYNC PROFILE CHANGES =================
-  useEffect(() => {
+  /* useEffect(() => {
     if (profile?.followers_count !== undefined) {
-      setFollowersCount(profile.followers_count);
+       setFollowersCount(profile.followers_count); 
     }
-  }, [profile?.followers_count]);
+  }, [profile?.followers_count]); */
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[99999] flex items-end justify-center">
+    <div className="fixed inset-0 z-[99999] flex items-end justify-center pb-6">
 
       {/* BACKDROP */}
       <div
         onClick={onClose}
-        className="absolute inset-0 bg-black/70 backdrop-blur-md"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
       />
 
       {/* SHEET */}
-      <div className="relative w-full h-[88vh] rounded-t-[40px] overflow-hidden shadow-[0_-10px_60px_rgba(0,0,0,0.6)] bg-gradient-to-b from-[#1b002f] via-[#4a0ea3] to-[#7a2cf5] flex flex-col">
+      <div className="
+    relative w-full
+    h-[78vh] max-h-[78vh]
+    mt-10
+    rounded-t-[40px]
+    overflow-hidden
+    shadow-[0_-15px_70px_rgba(0,0,0,0.6)]
+    bg-gradient-to-b from-[#1b002f] via-[#4a0ea3] to-[#7a2cf5]
+    flex flex-col
+  ">
 
         {/* HANDLE */}
-        <div className="relative z-20 flex justify-center pt-3">
-          <div className="w-20 h-1.5 rounded-full bg-white/30" />
+        <div className="flex justify-center pt-3">
+          <div className="w-14 h-1.5 rounded-full bg-white/30" />
         </div>
 
-        {/* CLOSE */}
-        <div className="absolute top-6 right-5 z-[99999]">
+        {/* CLOSE BUTTON */}
+        <div className="absolute top-6 right-3 z-50">
           <button
             onClick={onClose}
-            className="h-11 w-11 rounded-full bg-purple-600 text-white flex items-center justify-center"
+            className="h-10 w-10 rounded-full bg-black/30 backdrop-blur-md text-white flex items-center justify-center shadow-lg"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
         {/* CONTENT */}
-        <div className="relative flex-1 overflow-y-auto bg-white rounded-t-[40px] px-6 pt-8 pb-10">
+        <div className="
+      flex-1 overflow-y-auto
+      bg-white
+      rounded-t-[40px]
+      px-6 pt-10 pb-10
+    ">
 
           {/* AVATAR */}
           <div className="flex justify-center">
@@ -86,52 +98,64 @@ export default function ProfileModal({
                   setZoom(1);
                   setImageOpen(true);
                 }}
-                className="w-32 h-32 rounded-full object-cover border-4 border-purple-100 shadow-xl cursor-pointer"
+                className="
+              w-28 h-28 rounded-full
+              object-cover
+              border-4 border-purple-100
+              shadow-lg
+              cursor-pointer
+            "
               />
             ) : (
-              <div className="w-32 h-32 rounded-full bg-purple-600 flex items-center justify-center text-white text-5xl font-bold">
+              <div className="
+            w-28 h-28 rounded-full
+            bg-purple-600
+            flex items-center justify-center
+            text-white text-4xl font-bold
+            shadow-lg
+          ">
                 {(profile?.full_name || "U")[0]}
               </div>
             )}
           </div>
 
           {/* NAME */}
-          <h1 className="mt-6 text-center text-3xl font-bold text-gray-900">
+          <h1 className="mt-5 text-center text-2xl font-bold text-gray-900">
             {profile?.full_name || "Anonymous User"}
           </h1>
 
           {/* USERNAME */}
-          <p className="text-center text-gray-500 mt-2">
+          <p className="text-center text-gray-500 text-sm mt-1">
             @{username}
           </p>
 
           {/* BIO */}
-          <p className="text-center text-gray-600 mt-5 max-w-md mx-auto">
+          <p className="text-center text-gray-600 mt-4 max-w-md mx-auto text-sm">
             {profile?.bio || "No bio yet."}
           </p>
 
           {/* STATS */}
-          <div className="grid grid-cols-3 gap-3 mt-8">
+          <div className="grid grid-cols-3 gap-3 mt-7">
 
-            <div className="bg-purple-50 rounded-3xl p-4 text-center">
-              <div className="font-bold text-2xl text-purple-700">
+            <div className="bg-purple-50 rounded-2xl p-4 text-center">
+              <div className="font-bold text-xl text-purple-700">
                 {profile?.posts_count || 0}
               </div>
-              <div className="text-sm text-gray-500">Posts</div>
+              <div className="text-xs text-gray-500">Posts</div>
             </div>
 
-            <div className="bg-purple-50 rounded-3xl p-4 text-center">
-              <div className="font-bold text-2xl text-purple-700">
-                {profile?.followers_count}
+            <div className="bg-purple-50 rounded-2xl p-4 text-center">
+              <div className="font-bold text-xl text-purple-700">
+                {profile?.followers_count || 0}
               </div>
-              <div className="text-sm text-gray-500">Followers</div>
+              <div className="text-xs text-gray-500">Followers</div>
             </div>
 
-            <div className="bg-purple-50 rounded-3xl p-4 text-center">
-              <div className="font-bold text-2xl text-purple-700">
+            <div className="bg-purple-50 rounded-2xl p-4 text-center">
+              <div className="font-bold text-xl text-purple-700">
                 {profile?.following_count || 0}
               </div>
-              <div className="text-sm text-gray-500">Following</div>
+              <div className="text-xs text-gray-500">Following</div>
             </div>
 
           </div>
@@ -142,89 +166,94 @@ export default function ProfileModal({
             {isOwnProfile ? (
               <button
                 onClick={() => navigate(`/profile/${profile.id}`)}
-                className="flex-1 h-14 rounded-2xl bg-purple-600 text-white font-semibold"
+                className="
+              flex-1 h-12 rounded-2xl
+              bg-purple-600 text-white font-semibold
+              shadow-md active:scale-95
+              transition
+            "
               >
                 View Profile
               </button>
             ) : (
               <>
-                {/* FOLLOW BUTTON */}
                 <button
                   onClick={() => {
                     const willFollow = !isFollowing;
 
-                    // ✅ instant UI update (NO refresh)
                     setFollowersCount((prev) =>
-                      willFollow
-                        ? prev + 1
-                        : Math.max(prev - 1, 0)
+                      willFollow ? prev + 1 : Math.max(prev - 1, 0)
                     );
 
-                     onFollowToggle?.(profile);
-
+                    onFollowToggle?.(profile);
                   }}
-                  className={`flex-1 h-14 rounded-2xl font-semibold ${isFollowing
+                  className={`
+                flex-1 h-12 rounded-2xl font-semibold shadow-md
+                transition active:scale-95
+                ${isFollowing
                       ? "bg-gray-200 text-gray-800"
-                      : "bg-purple-600 text-white"
-                    }`}
+                      : "bg-purple-600 text-white"}
+              `}
                 >
                   {isFollowing ? "Following" : "Follow"}
                 </button>
 
                 <button
                   onClick={() => navigate(`/profile/${profile.id}`)}
-                  className="flex-1 h-14 rounded-2xl border-2 border-purple-200 text-purple-700 font-semibold"
+                  className="
+                flex-1 h-12 rounded-2xl
+                border border-purple-200
+                text-purple-700 font-semibold
+                bg-white
+                active:scale-95
+                transition
+              "
                 >
-                  View Profile
+                  View profile
                 </button>
               </>
             )}
 
           </div>
 
-          {/* IMAGE ZOOM MODAL */}
-          {imageOpen && (
-            <div className="fixed inset-0 z-[999999] bg-black flex items-center justify-center">
-
-              {/* BACKDROP (tap to close) */}
-              <div
-                className="absolute inset-0"
-                onClick={() => setImageOpen(false)}
-              />
-
-              {/* TOP BAR (WhatsApp style) */}
-              <div className="absolute top-0 left-0 right-0 flex items-center gap-3 p-4 z-10 bg-gradient-to-b from-black/60 to-transparent">
-
-                <button
-                  onClick={() => setImageOpen(false)}
-                  className="flex items-center justify-center w-10 h-10 rounded-full bg-black/40 text-white"
-                >
-                  <ArrowLeft size={20} />
-                </button>
-
-                <div className="text-white">
-                  <p className="font-semibold text-sm">
-                    {profile?.full_name || "User"}
-                  </p>
-
-                  <p className="text-xs text-white/70">
-                    @{username}
-                  </p>
-                </div>
-
-              </div>
-              {/* IMAGE */}
-              <img
-                src={profile?.avatar_url}
-                style={{ transform: `scale(${zoom})` }}
-                onClick={() => setZoom((z) => Math.min(z + 0.3, 3))}
-                className="max-w-full max-h-full object-contain cursor-zoom-in transition-transform duration-150"
-              />
-            </div>
-          )}
-
         </div>
       </div>
+
+      {/* IMAGE ZOOM MODAL */}
+      {imageOpen && (
+        <div className="fixed inset-0 z-[100000] bg-black flex items-center justify-center">
+
+          <div
+            className="absolute inset-0"
+            onClick={() => setImageOpen(false)}
+          />
+
+          <div className="absolute top-0 left-0 right-0 flex items-center gap-3 p-4 bg-black/40 backdrop-blur-md">
+            <button
+              onClick={() => setImageOpen(false)}
+              className="w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center"
+            >
+              <ArrowLeft size={18} />
+            </button>
+
+            <div className="text-white">
+              <p className="text-sm font-semibold">
+                {profile?.full_name || "User"}
+              </p>
+              <p className="text-xs text-white/70">
+                @{username}
+              </p>
+            </div>
+          </div>
+
+          <img
+            src={profile?.avatar_url}
+            style={{ transform: `scale(${zoom})` }}
+            onClick={() => setZoom((z) => Math.min(z + 0.3, 3))}
+            className="max-w-full max-h-full object-contain cursor-zoom-in transition-transform"
+          />
+        </div>
+      )}
     </div>
   );
 }

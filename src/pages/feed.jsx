@@ -92,6 +92,8 @@ export default function Feed({
   const [loadingMore, setLoadingMore] = useState(false);
   const [profileImages, setProfileImages] = useState({});
 
+  const [openMenuId, setOpenMenuId] = useState(null);
+
   const getProfileImage = async (userId) => {
     const { data, error } = await supabase
       .from("profiles")
@@ -1107,8 +1109,8 @@ export default function Feed({
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0f0f10] pb-24">
       {/* TOP */}
-      <div className="px-3 pt-3 overflow-x-auto scrollbar-hide">
-        <div className="flex gap-3 w-max">
+      <div className="px-3 pt-3">
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
 
           {[
             "all",
@@ -1124,19 +1126,18 @@ export default function Feed({
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`
-          px-4
-          py-1
-          rounded-lg
-          text-sm
-          font-semibold
-          whitespace-nowrap
-          transition-all
+          flex-shrink-0
+          px-5 py-2
+          rounded-full
+          text-sm font-medium
+          capitalize
+          transition-all duration-200
+          border
           active:scale-95
-          shadow-sm
 
           ${activeTab === tab
-                  ? "bg-purple-600 text-white border-purple-600 shadow-md"
-                  : "bg-white text-gray-700 border-gray-200 hover:border-purple-300 hover:bg-purple-50"
+                  ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-transparent shadow-md"
+                  : "bg-white text-gray-600 border-gray-200 hover:border-purple-400 hover:text-purple-600 hover:bg-purple-50"
                 }
         `}
             >
@@ -1146,7 +1147,6 @@ export default function Feed({
 
         </div>
       </div>
-
       <div className="sticky top-0 z-40 backdrop-blur-xl bg-white/80 dark:bg-[#111]/80 border-b border-gray-200 dark:border-white/10">
         <div className="h-14 px-4 flex items-center justify-between">
           <h1 className="text-xl font-black bg-gradient-to-r from-purple-600 to-fuchsia-600 bg-clip-text text-transparent">
@@ -1302,23 +1302,58 @@ export default function Feed({
 
                 {/* USER INFO */}
                 <div className="flex-1">
-                  <h3
-                    onClick={() => openUserProfile(post.user_id)}
-                    className="font-semibold text-sm text-gray-900 dark:text-white cursor-pointer"
-                  >
+                  <h3 className="font-semibold text-sm text-gray-900 dark:text-white">
                     {post.profile_name || "Anonymous"}
                   </h3>
 
                   <p className="text-xs text-gray-500 flex items-center gap-1">
-                    <Globe size={12} className="text-gray-400" />
+                    <Globe size={12} />
                     {post.created_at ? formatTimeAgo(post.created_at) : "Just now"}
                   </p>
                 </div>
 
-                {/* 3 DOTS MENU (SAFE ADDITION) */}
-                <button className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/5">
-                  <MoreVertical size={18} className="text-gray-600 dark:text-gray-300" />
-                </button>
+                {/* 3 DOTS MENU */}
+                <div className="relative">
+
+                  <button
+                    onClick={() =>
+                      setOpenMenuId((prev) =>
+                        prev === post.id ? null : post.id
+                      )
+                    }
+                    className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/5"
+                  >
+                    <MoreVertical size={18} />
+                  </button>
+
+                  {/* DROPDOWN */}
+                  {openMenuId === post.id && (
+                    <div className="absolute right-0 mt-2 w-36 bg-white dark:bg-[#222] shadow-lg rounded-xl overflow-hidden z-50 border border-gray-100 dark:border-white/10">
+
+                      <button
+                        onClick={() => {
+                          sharePost(post.id);
+                          setOpenMenuId(null);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-white/5"
+                      >
+                        Share
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          deletePost(post.id);
+                          setOpenMenuId(null);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"
+                      >
+                        Delete
+                      </button>
+
+                    </div>
+                  )}
+
+                </div>
 
               </div>
 
@@ -1331,13 +1366,13 @@ export default function Feed({
                 </div>
               )}
 
-              {/* ================= IMAGE POST ================= */}
+              {/* ================= IMAGE ================= */}
               {post.image && (
                 <div className="relative w-full bg-black overflow-hidden">
 
                   <img
                     src={post.cached_image || post.image}
-                    className="w-full object-cover"
+                    className="w-full max-h-[420px] object-contain bg-black"
                   />
 
                   {parsed?.layers?.map((layer) => (
@@ -1393,32 +1428,26 @@ export default function Feed({
               {/* ================= ACTION BAR ================= */}
               <div className="px-4 py-3">
 
-                {/* COUNTS */}
                 <div className="flex items-center justify-between mb-3">
 
                   <div className="flex items-center gap-5">
 
-                    {/* LIKES (UNCHANGED LOGIC SAFE) */}
                     <div className="flex items-center gap-1">
-                      <Heart
-                        size={20}
-                        className="text-red-500"
-                        fill="currentColor"
-                      />
+                      <Heart size={20} className="text-red-500" fill="currentColor" />
                       <span className="text-sm text-gray-600 dark:text-gray-300">
                         {post.likes_count || 0}
                       </span>
                     </div>
 
                     <div className="text-sm text-gray-600 dark:text-gray-300">
-                      <span className="font-semibold text-gray-900 dark:text-white">
+                      <span className="font-semibold">
                         {post.comments_count || 0}
                       </span>{" "}
                       comments
                     </div>
 
                     <div className="text-sm text-gray-600 dark:text-gray-300">
-                      <span className="font-semibold text-gray-900 dark:text-white">
+                      <span className="font-semibold">
                         {post.shares_count || 0}
                       </span>{" "}
                       shares
@@ -1431,27 +1460,30 @@ export default function Feed({
                   </div>
                 </div>
 
-                {/* BUTTONS (NO TOUCH TO LIKE SYSTEM) */}
                 <div className="grid grid-cols-3 gap-2 border-t border-gray-100 dark:border-white/5 pt-3">
+
                   <button
                     onClick={() => likePost(post.id)}
-                    className={`flex items-center justify-center gap-2 h-11 rounded-2xl transition-all active:scale-95 ${likedPosts?.[post.id]
+                    className={`
+    flex items-center justify-center gap-2 h-11 rounded-2xl
+    transition-all active:scale-95
+    ${likedPosts?.[post.id]
                         ? "text-blue-500 bg-blue-500/10"
                         : "hover:bg-gray-100 dark:hover:bg-white/5 text-gray-700 dark:text-gray-200"
-                      }`}
+                      }
+  `}
                   >
                     <ThumbsUp
                       size={18}
-                      className={`transition-all duration-200 ${animatingLike === post.id ? "scale-150 rotate-12 text-blue-500" : ""
-                        }`}
+                      className={`
+      transition-all duration-200
+      ${animatingLike === post.id ? "scale-150 rotate-12 text-blue-500" : ""}
+    `}
                       fill={likedPosts?.[post.id] ? "currentColor" : "none"}
                     />
 
-                    <span className="text-sm font-semibold">
-                      Like
-                    </span>
+                    <span className="text-sm font-semibold">Like</span>
                   </button>
-
                   <button
                     onClick={() => {
                       openComments(post);
