@@ -10,6 +10,7 @@ import { useNavigate } from "react-router-dom";
 export default function ProfilePage() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [me, setme] = useState(null)
 
   const navigate = useNavigate();
 
@@ -23,10 +24,15 @@ export default function ProfilePage() {
           data: { user },
         } = await supabase.auth.getUser();
 
+        setme(user);
+
+        console.log(user)
+
         if (!user) {
           setProfile(null);
           return;
         }
+
 
         const cacheKey = `profile-${user.id}`;
 
@@ -40,7 +46,9 @@ export default function ProfilePage() {
           .from("profiles")
           .select("*")
           .eq("id", user.id)
-          .single();
+          .maybeSingle();
+
+
 
         if (error) throw error;
 
@@ -204,14 +212,38 @@ export default function ProfilePage() {
   // ================= LOADING =================
   if (loading) {
     return (
-      <div className="min-h-screen bg-black text-white p-6 animate-pulse">
-        <div className="h-56 rounded-3xl bg-purple-900/30" />
+      <div className="min-h-screen bg-white">
+        {/* Header */}
+        <div className="sticky top-0 bg-white border-b border-gray-200">
+          <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
+            <button
+              onClick={() => navigate("/feed")}
+              className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+            >
+              <FiArrowLeft />
+            </button>
 
-        <div className="w-28 h-28 rounded-full bg-purple-900/30 border-4 border-black -mt-14 ml-6" />
+            <h1 className="font-semibold text-gray-900">
+              Profile
+            </h1>
+          </div>
+        </div>
 
-        <div className="mt-6 h-5 w-48 bg-purple-900/30 rounded" />
+        <div className="max-w-2xl mx-auto p-6 animate-pulse">
+          <div className="h-48 rounded-3xl bg-gray-200" />
 
-        <div className="mt-3 h-4 w-32 bg-purple-900/20 rounded" />
+          <div className="w-28 h-28 rounded-full bg-gray-200 border-4 border-white -mt-14 ml-6 relative z-10" />
+
+          <div className="mt-6 h-6 w-56 bg-gray-200 rounded" />
+
+          <div className="mt-3 h-4 w-40 bg-gray-100 rounded" />
+
+          <div className="mt-8 space-y-3">
+            <div className="h-20 bg-gray-100 rounded-2xl" />
+            <div className="h-20 bg-gray-100 rounded-2xl" />
+            <div className="h-20 bg-gray-100 rounded-2xl" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -219,161 +251,262 @@ export default function ProfilePage() {
   // ================= NO PROFILE =================
   if (!profile) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center text-white">
-        No profile found
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="max-w-xl mx-auto pb-10">
-
-        {/* HEADER */}
-        <div className="sticky top-0 z-50 backdrop-blur-xl bg-black/70 border-b border-white/10">
-          <div className="flex items-center gap-3 px-4 py-4">
+      <div className="min-h-screen bg-white">
+        {/* Header */}
+        <div className="sticky top-0 bg-white border-b border-gray-200">
+          <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
             <button
               onClick={() => navigate("/feed")}
-              className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center"
+              className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
             >
               <FiArrowLeft />
             </button>
 
-            <div>
-              <h1 className="font-bold text-lg">
-                My Profile
-              </h1>
-
-              <p className="text-xs text-purple-300">
-                @{profile.username}
-              </p>
-            </div>
+            <h1 className="font-semibold text-gray-900">
+              Profile
+            </h1>
           </div>
         </div>
 
-        {/* COVER */}
-        <div className="relative h-60 mx-4 mt-4 rounded-[32px] overflow-hidden">
-          <img
-            src={
-              profile.avatar_url ||
-              `https://ui-avatars.com/api/?name=${profile.full_name}`
-            }
-            alt=""
-            className="w-full h-full object-cover"
-          />
-
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
-        </div>
-
-        {/* PROFILE */}
-        <div className="flex items-end gap-4 px-6 -mt-16 relative z-10">
-
-          <div className="relative">
-            <img
-              src={
-                profile.avatar_url ||
-                `https://ui-avatars.com/api/?name=${profile.full_name}`
-              }
-              alt=""
-              className="w-32 h-32 rounded-full object-cover border-4 border-black shadow-2xl"
-            />
-
-            {/* ONLY EDITABLE THING */}
-            <label className="absolute bottom-2 right-2 bg-purple-600 hover:bg-purple-700 p-2 rounded-full cursor-pointer transition">
-              <FiCamera size={16} />
-
-              <input
-                type="file"
-                accept="image/*"
-                hidden
-                onChange={(e) =>
-                  uploadAvatar(e.target.files?.[0])
-                }
-              />
-            </label>
+        <div className="flex flex-col items-center justify-center py-32 px-6 text-center">
+          <div className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center mb-6">
+            <span className="text-4xl">👤</span>
           </div>
 
-          <div className="pb-3">
-            <h2 className="text-2xl font-bold">
-              {profile.full_name || "Anonymous User"}
-            </h2>
+          <h2 className="text-2xl font-bold text-gray-900">
+            No Profile Yet
+          </h2>
 
-            <p className="text-purple-300 text-sm">
-              @{profile.username}
-            </p>
-          </div>
-        </div>
-
-        {/* BIO */}
-        <div className="px-6 mt-5">
-          <p className="text-gray-300 leading-relaxed">
-            {profile.bio || "No bio added yet."}
+          <p className="text-gray-500 mt-2 max-w-sm">
+            Your profile information hasn't been set up yet.
           </p>
-        </div>
 
-        {/* STATS */}
-        <div className="grid grid-cols-3 gap-4 px-4 mt-8">
-          {[
-            {
-              title: "Posts",
-              value: profile.posts_count || 0,
-            },
-            {
-              title: "Followers",
-              value: profile.followers_count || 0,
-            },
-            {
-              title: "Following",
-              value: profile.following_count || 0,
-            },
-          ].map((item) => (
-            <div
-              key={item.title}
-              className="rounded-3xl border border-purple-500/20 bg-gradient-to-br from-purple-900/30 to-purple-800/10 p-5 text-center"
-            >
-              <p className="text-2xl font-bold">
-                {item.value}
-              </p>
-
-              <p className="text-xs text-purple-300 mt-1">
-                {item.title}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        {/* INFO CARD */}
-        <div className="mx-4 mt-8 rounded-[32px] bg-white/5 border border-white/10 p-5">
-
-          <h3 className="font-semibold text-lg mb-4">
-            Personal Information
-          </h3>
-
-          <Field label="Full Name" value={profile.full_name} />
-
-          <Field label="Username" value={profile.username} />
-
-          <Field label="Bio" value={profile.bio} />
-
-          <Field label="Website" value={profile.website} />
-
-          <Field label="Location" value={profile.location} />
-
-          <Field label="School" value={profile.school} />
-
-          <Field
-            label="Department"
-            value={profile.department}
-          />
-
-          <Field label="Hobby" value={profile.hobby} />
-
-          <Field
-            label="Relationship Status"
-            value={profile.relationship_status}
-          />
+          <button
+            onClick={() => navigate("/feed")}
+            className="mt-6 px-6 py-3 rounded-xl bg-black text-white hover:bg-gray-800 transition"
+          >
+            Go Back
+          </button>
         </div>
       </div>
+    );
+  }
+
+
+  // ================= PROFILE PAGE =================
+  return (
+    <div className="min-h-screen bg-white text-gray-900">
+
+      <div className="max-w-2xl mx-auto pb-10">
+
+        {/* HEADER */}
+        <div className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-gray-200">
+
+          <div className="flex items-center gap-4 px-5 py-4">
+
+            <button
+              onClick={() => navigate("/feed")}
+              className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+            >
+              <FiArrowLeft />
+            </button>
+
+
+            <div>
+
+              <h1 className="font-bold text-xl">
+                Profile
+              </h1>
+
+              <p className="text-sm text-gray-500">
+                @{profile?.username}
+              </p>
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+
+        {/* COVER */}
+        <div className="h-52 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500" />
+
+
+
+        {/* PROFILE CARD */}
+        <div className="px-6 -mt-16 relative">
+
+          <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6">
+
+
+            <div className="flex flex-col md:flex-row gap-5 items-center md:items-start">
+
+
+              {/* AVATAR */}
+              <div className="relative">
+
+
+                <img
+                  src={
+                    profile?.avatar_url ||
+                    `https://ui-avatars.com/api/?name=${user?.user_metadata?.full_name}`
+                  }
+                  className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-lg"
+                />
+
+
+                <label className="absolute bottom-1 right-1 bg-black text-white p-2 rounded-full cursor-pointer">
+
+                  <FiCamera size={16} />
+
+
+                  <input
+                    type="file"
+                    hidden
+                    accept="image/*"
+                    onChange={(e) =>
+                      uploadAvatar(e.target.files?.[0])
+                    }
+                  />
+
+                </label>
+
+              </div>
+
+
+
+
+              {/* NAME */}
+              <div className="flex-1 text-center md:text-left">
+
+
+                <h2 className="text-3xl font-bold">
+
+                  {me?.user_metadata?.full_name ||
+                    "Anonymous User"}
+
+                </h2>
+
+
+                <p className="text-gray-500">
+                  @{profile?.username}
+                </p>
+
+
+                <p className="mt-4 text-gray-700">
+
+                  {profile?.bio ||
+                    "No bio added yet."}
+
+                </p>
+
+
+
+                <button
+                  onClick={() => navigate("/settings")}
+                  className="mt-5 px-5 py-2 rounded-xl bg-black text-white"
+                >
+                  Edit Profile
+                </button>
+
+
+              </div>
+
+
+            </div>
+
+
+
+
+
+            {/* STATS */}
+            <div className="grid grid-cols-3 gap-4 mt-8">
+
+
+              <div className="bg-gray-50 rounded-2xl p-4 text-center">
+                <b>{profile?.posts_count || 0}</b>
+                <p className="text-sm text-gray-500">Posts</p>
+              </div>
+
+
+              <div className="bg-gray-50 rounded-2xl p-4 text-center">
+                <b>{profile?.followers_count || 0}</b>
+                <p className="text-sm text-gray-500">Followers</p>
+              </div>
+
+
+              <div className="bg-gray-50 rounded-2xl p-4 text-center">
+                <b>{profile?.following_count || 0}</b>
+                <p className="text-sm text-gray-500">Following</p>
+              </div>
+
+
+            </div>
+
+
+          </div>
+
+        </div>
+
+
+
+
+
+        {/* INFO */}
+        <div className="px-6 mt-8">
+
+
+          <div className="bg-white border border-gray-200 rounded-3xl shadow-sm">
+
+
+            <h3 className="p-5 font-bold text-lg border-b">
+              Personal Information
+            </h3>
+
+
+
+            {[
+              ["Full Name", me?.user_metadata?.full_name],
+              ["Username", profile?.username],
+              ["Bio", profile?.bio],
+              ["Website", profile?.website],
+              ["Location", profile?.location],
+              ["School", profile?.school],
+              ["Department", profile?.department],
+              ["Hobby", profile?.hobby],
+            ].map(([label, value]) => (
+
+              <div
+                key={label}
+                className="p-5 border-b last:border-0"
+              >
+
+                <p className="text-xs text-gray-400 uppercase">
+                  {label}
+                </p>
+
+
+                <p className="mt-1">
+                  {value || "Not provided"}
+                </p>
+
+              </div>
+
+            ))}
+
+
+          </div>
+
+
+        </div>
+
+
+      </div>
+
+
     </div>
-  );
+  )
+
 }

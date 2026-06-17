@@ -50,6 +50,7 @@ export default function SignupPage({ onNavigate }) {
         throw new Error("User creation failed");
       }
 
+
       const { error: profileError } = await supabase
         .from("profiles")
         .insert({
