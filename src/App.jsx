@@ -23,8 +23,6 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [showSplash, setShowSplash] = useState(true);
 
-  
-
   // ================= SPLASH =================
   useEffect(() => {
     const timer = setTimeout(() => setShowSplash(false), 2000);
@@ -43,9 +41,6 @@ export default function App() {
 
     return () => subscription.unsubscribe();
   }, []);
-
-
-
 
   const checkSession = async () => {
     const {
