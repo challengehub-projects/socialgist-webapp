@@ -1122,8 +1122,10 @@ export default function TopNavbar({
 
             {/* SWITCH ACCOUNT */}
             <button
-              onClick={() => {
-                setShowProfileMenu(false);
+              onClick={async() => {
+                await supabase.auth.signOut();
+                sessionStorage.clear();
+                window.location.reload();
                 navigate("/login");
               }}
               className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-100 dark:hover:bg-white/5 transition dark:text-white"
@@ -1138,6 +1140,7 @@ export default function TopNavbar({
                 await supabase.auth.signOut();
                 sessionStorage.clear();
                 window.location.reload();
+                navigate("/login");
               }}
               className="w-full flex items-center gap-4 px-5 py-4 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-500 transition"
             >
@@ -1319,6 +1322,7 @@ export default function TopNavbar({
                 key={layer.id}
                 bounds="parent"
                 enableResizing={false}
+                disableDragging={selected === layer.id}
                 position={{
                   x: layer.x,
                   y: layer.y,
@@ -1329,9 +1333,9 @@ export default function TopNavbar({
                     y: d.y,
                   });
                 }}
-                onClick={() =>
-                  setSelected(layer.id)
-                }
+                onMouseDown={() => {
+                  setSelected(layer.id);
+                }}
               >
                 <div
                   contentEditable
@@ -1342,13 +1346,16 @@ export default function TopNavbar({
                     setSelected(layer.id);
                     e.currentTarget.focus();
                   }}
+                  onFocus={() => {
+                    setSelected(layer.id);
+                  }}
                   onBlur={(e) => {
                     updateLayer(layer.id, {
                       text: e.currentTarget.innerText,
                     });
                   }}
                   style={{
-                    width: layer.width,
+                    minWidth: 250,
                     minHeight: 50,
                     color: layer.color,
                     fontSize: layer.fontSize,
@@ -1357,7 +1364,13 @@ export default function TopNavbar({
                     overflowWrap: "break-word",
                     outline: "none",
                     caretColor: "#fff",
-                    lineHeight: 2,
+                    lineHeight: 1.4,
+                    cursor: "text",
+                    userSelect: "text",
+                    WebkitUserSelect: "text",
+                    touchAction: "manipulation",
+                    padding: "4px 8px",
+                    textAlign: "center",
                   }}
                 >
                   {layer.text}

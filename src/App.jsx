@@ -23,11 +23,14 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [showSplash, setShowSplash] = useState(true);
 
+
+
   // ================= SPLASH =================
   useEffect(() => {
     const timer = setTimeout(() => setShowSplash(false), 2000);
     return () => clearTimeout(timer);
   }, []);
+
 
   // ================= AUTH =================
   useEffect(() => {
@@ -42,6 +45,136 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+
+  // ================= ONESIGNAL NOTIFICATIONS =================
+  useEffect(() => {
+
+    window.OneSignalDeferred =
+      window.OneSignalDeferred || [];
+
+
+    window.OneSignalDeferred.push(async (OneSignal) => {
+
+      try {
+
+        console.log("🔥 OneSignal ready");
+
+
+        // Ask browser permission
+        if (!OneSignal.Notifications.permission) {
+
+          await OneSignal.Notifications.requestPermission();
+
+        }
+
+
+        console.log(
+          "🔔 Permission:",
+          OneSignal.Notifications.permission
+        );
+
+
+        if (!OneSignal.Notifications.permission) {
+          console.log("❌ Notifications blocked");
+          return;
+        }
+
+
+        // Get logged user
+        const {
+          data: {
+            user
+          }
+        } = await supabase.auth.getUser();
+
+
+        if (!user) {
+          console.log("No user");
+          return;
+        }
+
+
+        // connect OneSignal user
+        await OneSignal.login(user.id);
+
+
+        // make sure subscription exists
+        await OneSignal.User.PushSubscription.optIn();
+
+
+        const subscriptionId =
+          OneSignal.User.PushSubscription.id;
+
+
+        console.log(
+          "🔥 Subscription ID:",
+          subscriptionId
+        );
+
+
+        console.log(
+          "🔥 OneSignal User:",
+          OneSignal.User.onesignalId
+        );
+
+
+        // save subscription to supabase
+        if (subscriptionId) {
+
+          await supabase
+            .from("profiles")
+            .update({
+              onesignal_subscription_id: subscriptionId
+            })
+            .eq(
+              "id",
+              user.id
+            );
+
+
+          console.log(
+            "✅ Subscription saved"
+          );
+        }
+
+
+      } catch (err) {
+
+        console.error(
+          "OneSignal setup error:",
+          err
+        );
+
+      }
+
+    });
+
+
+  }, [session]);
+
+
+
+  useEffect(() => {
+
+window.OneSignalDeferred.push(async (OneSignal)=>{
+
+console.log("OBJECT", OneSignal);
+
+console.log(
+"permission",
+OneSignal.Notifications.permission
+);
+
+console.log(
+"subscription",
+OneSignal.User.PushSubscription
+);
+
+});
+
+}, []);
+
+
   const checkSession = async () => {
     const {
       data: { session },
@@ -50,6 +183,9 @@ export default function App() {
     setSession(session);
     setLoading(false);
   };
+
+
+
 
   // ================= SPLASH UI =================
   if (showSplash) {
@@ -138,7 +274,7 @@ export default function App() {
         />
 
 
-         <Route
+        <Route
           path="/settings"
           element={
             session ? <SettingsPage /> : <Navigate to="/" />

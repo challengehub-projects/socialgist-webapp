@@ -111,88 +111,72 @@ export default function Feed({
 
 
 
-
   const toggleFollow = async (profile) => {
     if (!me?.id || !profile?.id) return;
 
-    try {
-      const isFollowing = followingIds.includes(profile.id);
+    const alreadyFollowing = followingIds.includes(profile.id);
 
-      // ================= UNFOLLOW =================
-      if (isFollowing) {
-        setFollowingIds((prev) =>
-          prev.filter((id) => id !== profile.id)
+    try {
+      if (alreadyFollowing) {
+        const { error } = await supabase
+          .from("follows")
+          .delete()
+          .eq("follower_id", me.id)
+          .eq("following_id", profile.id);
+
+        if (error) throw error;
+
+        setFollowingIds(prev =>
+          prev.filter(id => id !== profile.id)
         );
 
-        setProfileData((prev) => ({
-          ...prev,
-          isFollowing: false,
-          followers_count: Math.max(
-            (prev?.followers_count || 0) - 1,
-            0
-          ),
-        }));
+        // UPDATE MODAL COUNT IMMEDIATELY
+        setProfileData(prev =>
+          prev?.id === profile.id
+            ? {
+              ...prev,
+              followers_count: Math.max(
+                (prev.followers_count || 0) - 1,
+                0
+              ),
+            }
+            : prev
+        );
 
-        // decrease target user's followers
-        await supabase
-          .from("profiles")
-          .update({
-            followers_count: Math.max(
-              (profile.followers_count || 0) - 1,
-              0
-            ),
-          })
-        console.log("user count decresed")
-          .eq("id", profile.id);
+        await supabase.rpc("decrease_followers", {
+          target_id: profile.id,
+          my_id: me.id,
+        });
 
-        // decrease my following count
-        await supabase
-          .from("profiles")
-          .update({
-            following_count: Math.max(
-              (me.following_count || 0) - 1,
-              0
-            ),
-          })
-          .eq("id", me.id);
+      } else {
+        const { error } = await supabase
+          .from("follows")
+          .insert({
+            follower_id: me.id,
+            following_id: profile.id,
+          });
 
-        console.log("my count decreesed")
-        return;
+        if (error) throw error;
+
+        setFollowingIds(prev => [...prev, profile.id]);
+
+        // UPDATE MODAL COUNT IMMEDIATELY
+        setProfileData(prev =>
+          prev?.id === profile.id
+            ? {
+              ...prev,
+              followers_count: (prev.followers_count || 0) + 1,
+            }
+            : prev
+        );
+
+        await supabase.rpc("increase_followers", {
+          target_id: profile.id,
+          my_id: me.id,
+        });
       }
-
-      // ================= FOLLOW =================
-      setFollowingIds((prev) => [...prev, profile.id]);
-
-      setProfileData((prev) => ({
-        ...prev,
-        isFollowing: true,
-        followers_count: (prev?.followers_count || 0) + 1,
-      }));
-
-      // increase target user's followers
-      await supabase
-        .from("profiles")
-        .update({
-          followers_count:
-            (profile.followers_count || 0) + 1,
-        })
-        .eq("id", profile.id);
-
-      console.log("user increased")
-
-      // increase my following count
-      await supabase
-        .from("profiles")
-        .update({
-          following_count:
-            (me.following_count || 0) + 1,
-        })
-        .eq("id", me.id);
-
-      console.log("mine incread")
-
     } catch (err) {
-      console.error("Follow toggle error:", err.message);
+      console.log("FOLLOW ERROR", err.message);
     }
   };
 
@@ -241,16 +225,43 @@ export default function Feed({
   };
 
   useEffect(() => {
-    const setupPush = async () => {
-      if (!me?.id) return;
+    if (!me?.id) return;
 
-     /*  await OneSignal.login(me.id); */
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
 
-      console.log("subscribed")
-    };
+    window.OneSignalDeferred.push(async function (OneSignal) {
+      try {
 
-    setupPush();
-  }, [me]);
+        // wait until OneSignal is ready
+        const permission = OneSignal.Notifications.permission;
+
+        if (!permission) {
+          await OneSignal.Notifications.requestPermission();
+        }
+
+        // wait for subscription
+        const subscriptionId =
+          OneSignal.User.PushSubscription.id;
+
+        console.log("Subscription:", subscriptionId);
+
+        if (subscriptionId) {
+          await OneSignal.login(String(me.id));
+
+          console.log(
+            "OneSignal linked:",
+            me.id
+          );
+        } else {
+          console.log("No push subscription yet");
+        }
+
+      } catch (err) {
+        console.error("OneSignal setup error:", err);
+      }
+    });
+
+  }, [me?.id]);
 
   useEffect(() => {
     setPage(0);
@@ -274,13 +285,12 @@ export default function Feed({
 
       if (error) throw error;
 
-      const enriched = {
+      setProfileData({
         ...data,
         viewer_id: me?.id,
         isFollowing: followingIds.includes(userId),
-      };
+      });
 
-      setProfileData(enriched);
     } catch (err) {
       console.log("Profile load error:", err);
     }
@@ -323,7 +333,7 @@ export default function Feed({
 
 
   const getUserProfile = async (userId) => {
-    if (!userId || !me?.id) return null;
+    if (!userId) return null;
 
     try {
       const { data, error } = await supabase
@@ -334,17 +344,13 @@ export default function Feed({
 
       if (error) throw error;
 
-      // 🔥 fallback: determine follow state from local memory (NOT DB table)
-      const isFollowing =
-        followingIds?.includes(userId) || false;
 
-      const enrichedProfile = {
+      return {
         ...data,
-        isFollowing,
-        viewer_id: me.id,
+        viewer_id: me?.id,
+        isFollowing: followingIds.includes(userId),
       };
 
-      return enrichedProfile;
     } catch (err) {
       console.error("Profile fetch error:", err.message);
       return null;
@@ -354,54 +360,82 @@ export default function Feed({
   useEffect(() => {
     const loadProfile = async () => {
       const profile = await getUserProfile(me?.id);
-      setProfileId(profile.id)
+
+      if (!profile) return;
+
+      setProfileId(profile.id);
       console.log(profile);
     };
 
-    if (me?.id)
+    if (me?.id) {
       loadProfile();
+    }
 
   }, [me?.id]);
 
 
 
 
-/*    useEffect(() => {
+  /*    useEffect(() => {
+  
+      if (!me?.id) return;
+  
+  
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+  
+  
+      window.OneSignalDeferred.push(async function (OneSignal) {
+  
+        try {
+  
+          await OneSignal.login(me.id);
+  
+  
+          console.log(
+            "OneSignal user connected:",
+            me.id
+          );
+  
+        } catch (err) {
+  
+          console.log(
+            "OneSignal login error:",
+            err
+          );
+  
+        }
+  
+      });
+  
+  
+    }, [me?.id]);
+  
+    */
 
+  const loadFollowing = async () => {
     if (!me?.id) return;
 
+    const { data, error } = await supabase
+      .from("follows")
+      .select("following_id")
+      .eq("follower_id", me.id);
 
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-
-
-    window.OneSignalDeferred.push(async function (OneSignal) {
-
-      try {
-
-        await OneSignal.login(me.id);
-
-
-        console.log(
-          "OneSignal user connected:",
-          me.id
-        );
-
-      } catch (err) {
-
-        console.log(
-          "OneSignal login error:",
-          err
-        );
-
-      }
-
-    });
+    if (error) {
+      console.log(error);
+      return;
+    }
 
 
+    setFollowingIds(
+      data.map(item => item.following_id)
+    );
+  };
+
+  useEffect(() => {
+    if (me?.id) {
+      loadFollowing();
+    }
   }, [me?.id]);
-
-  */
-
 
   const addCommentToPost = async () => {
     if (!commentText.trim() || !activePost) return;
@@ -1125,10 +1159,9 @@ export default function Feed({
             "all",
             "sports",
             "memes",
-            "jokes",
             "dating",
             "trading",
-            "finance",
+            "news",
             "academics",
           ].map((tab) => (
             <button
@@ -1293,76 +1326,114 @@ export default function Feed({
               {/* ================= HEADER ================= */}
               <div className="flex items-center gap-3 px-4 py-4 relative">
 
-                {/* AVATAR */}
-                {post.profile_image ? (
-                  <img
-                    src={profileImages[post.user_id]}
-                    onClick={() => openUserProfile(post.user_id)}
-                    className="h-12 w-12 rounded-full object-cover ring-2 ring-purple-500 cursor-pointer active:scale-95 transition"
-                  />
-                ) : (
-                  <div
-                    onClick={() => openUserProfile(post.user_id)}
-                    className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-fuchsia-500 flex items-center justify-center text-white font-bold text-sm cursor-pointer"
-                  >
-                    {(post.profile_name || "U").charAt(0).toUpperCase()}
+                {/* CLICKABLE USER HEADER */}
+                <div
+                  onClick={() => openUserProfile(post.user_id)}
+                  className="flex items-center gap-3 flex-1 cursor-pointer active:scale-[0.98] transition"
+                >
+
+                  {/* AVATAR */}
+                  {profileImages[post.user_id] ? (
+                    <img
+                      src={profileImages[post.user_id]}
+                      className="h-12 w-12 rounded-full object-cover ring-2 ring-purple-500"
+                    />
+                  ) : (
+                    <div
+                      className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-fuchsia-500 flex items-center justify-center text-white font-bold text-sm"
+                    >
+                      {(post.profile_name || "U").charAt(0).toUpperCase()}
+                    </div>
+                  )}
+
+
+                  {/* USER INFO */}
+                  <div className="min-w-0">
+
+                    <h3 className="font-semibold text-sm text-gray-900 dark:text-white truncate">
+                      {post.profile_name || "Anonymous"}
+                    </h3>
+
+                    <div className="flex items-center gap-1 text-xs text-gray-500">
+                      <Globe size={12} />
+
+                      <span>
+                        {post.created_at
+                          ? formatTimeAgo(post.created_at)
+                          : "Just now"}
+                      </span>
+
+                    </div>
+
                   </div>
-                )}
 
-                {/* USER INFO */}
-                <div className="flex-1">
-                  <h3 className="font-semibold text-sm text-gray-900 dark:text-white">
-                    {post.profile_name || "Anonymous"}
-                  </h3>
-
-                  <p className="text-xs text-gray-500 flex items-center gap-1">
-                    <Globe size={12} />
-                    {post.created_at ? formatTimeAgo(post.created_at) : "Just now"}
-                  </p>
                 </div>
+
+
 
                 {/* 3 DOTS MENU */}
                 <div className="relative">
 
                   <button
-                    onClick={() =>
+                    onClick={(e) => {
+                      e.stopPropagation();
+
                       setOpenMenuId((prev) =>
                         prev === post.id ? null : post.id
-                      )
-                    }
+                      );
+                    }}
                     className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/5"
                   >
                     <MoreVertical size={18} />
                   </button>
 
-                  {/* DROPDOWN */}
+
                   {openMenuId === post.id && (
-                    <div className="absolute right-0 mt-2 w-36 bg-white dark:bg-[#222] shadow-lg rounded-xl overflow-hidden z-50 border border-gray-100 dark:border-white/10">
+
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="
+        absolute right-0 mt-2 w-36
+        bg-white dark:bg-[#222]
+        shadow-lg rounded-xl overflow-hidden
+        z-50 border border-gray-100 dark:border-white/10
+        "
+                    >
 
                       <button
                         onClick={() => {
                           sharePost(post.id);
                           setOpenMenuId(null);
                         }}
-                        className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-white/5"
+                        className="
+          w-full text-left px-4 py-2 text-sm
+          hover:bg-gray-100 dark:hover:bg-white/5
+          "
                       >
                         Share
                       </button>
+
 
                       <button
                         onClick={() => {
                           deletePost(post.id);
                           setOpenMenuId(null);
                         }}
-                        className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"
+                        className="
+          w-full text-left px-4 py-2 text-sm text-red-500
+          hover:bg-red-50 dark:hover:bg-red-500/10
+          "
                       >
                         Delete
                       </button>
 
+
                     </div>
+
                   )}
 
                 </div>
+
 
               </div>
 
@@ -1500,12 +1571,25 @@ export default function Feed({
                       setComments(post.comments || []);
                       setOpen(true);
                     }}
-                    className="flex items-center justify-center gap-2 h-11 rounded-2xl hover:bg-gray-100 dark:hover:bg-white/5"
+                    className="
+    flex items-center justify-center gap-2
+    h-11 rounded-2xl
+    text-gray-700
+    dark:text-white
+    hover:bg-gray-100
+    dark:hover:bg-white/5
+    transition
+  "
                   >
-                    <MessageCircle size={18} />
-                    Comment
-                  </button>
+                    <MessageCircle
+                      size={18}
+                      className="text-gray-700 dark:text-white"
+                    />
 
+                    <span>
+                      Comment
+                    </span>
+                  </button>
                   <button
                     onClick={() => sharePost(post.id)}
                     className="flex items-center justify-center gap-2 h-11 rounded-2xl bg-purple-500/10 text-purple-600"
@@ -1732,7 +1816,11 @@ export default function Feed({
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
         profile={profileData}
-        isFollowing={profileData ? followingIds.includes(profileData.id) : false}
+        isFollowing={
+          profileData
+            ? followingIds.includes(profileData.id)
+            : false
+        }
         onFollowToggle={toggleFollow}
         currentUserProfileId={profileId}
       />

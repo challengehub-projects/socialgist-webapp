@@ -13,8 +13,7 @@ export default function ProfileModal({
   const [imageOpen, setImageOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
 
-  // ✅ LOCAL UI STATE (IMPORTANT FIX)
-  const [followersCount, setFollowersCount] = useState(0);
+ 
 
   const navigate = useNavigate();
 
@@ -24,7 +23,7 @@ export default function ProfileModal({
   const isOwnProfile =
     currentUserProfileId && profile?.id === currentUserProfileId;
 
-  console.log(currentUserProfileId, profile?.id)
+/*   console.log(currentUserProfileId, profile?.id) */
 
   // ================= ESC CLOSE =================
   useEffect(() => {
@@ -36,14 +35,11 @@ export default function ProfileModal({
     return () => window.removeEventListener("keydown", handleKey);
   }, [onClose]);
 
-  // ================= SYNC PROFILE CHANGES =================
-  /* useEffect(() => {
-    if (profile?.followers_count !== undefined) {
-       setFollowersCount(profile.followers_count); 
-    }
-  }, [profile?.followers_count]); */
+
 
   if (!open) return null;
+
+  console.log(profile)
 
   return (
     <div className="fixed inset-0 z-[99999] flex items-end justify-center pb-6">
@@ -177,13 +173,9 @@ export default function ProfileModal({
               </button>
             ) : (
               <>
-                <button
+             {/*    <button
                   onClick={() => {
                     const willFollow = !isFollowing;
-
-                    setFollowersCount((prev) =>
-                      willFollow ? prev + 1 : Math.max(prev - 1, 0)
-                    );
 
                     onFollowToggle?.(profile);
                   }}
@@ -196,7 +188,18 @@ export default function ProfileModal({
               `}
                 >
                   {isFollowing ? "Following" : "Follow"}
-                </button>
+                </button> */}
+
+              <button
+ onClick={() => {
+   onFollowToggle?.(profile);
+ }}
+  className="
+                flex-1 h-12 rounded-2xl font-semibold shadow-md
+                transition active:scale-95"
+>
+ {isFollowing ? "Following" : "Follow"}
+</button>
 
                 <button
                   onClick={() => navigate(`/profile/${profile.id}`)}
@@ -223,35 +226,98 @@ export default function ProfileModal({
       {imageOpen && (
         <div className="fixed inset-0 z-[100000] bg-black flex items-center justify-center">
 
+          {/* BACKGROUND */}
           <div
             className="absolute inset-0"
-            onClick={() => setImageOpen(false)}
+            onClick={() => {
+              setImageOpen(false);
+              setZoom(1);
+            }}
           />
 
-          <div className="absolute top-0 left-0 right-0 flex items-center gap-3 p-4 bg-black/40 backdrop-blur-md">
+
+          {/* HEADER */}
+          <div className="
+      absolute
+      top-0
+      left-0
+      right-0
+      z-20
+      flex
+      items-center
+      gap-3
+      px-4
+      py-4
+      bg-gradient-to-b
+      from-black/80
+      to-transparent
+    ">
+
             <button
-              onClick={() => setImageOpen(false)}
-              className="w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center"
+              onClick={() => {
+                setImageOpen(false);
+                setZoom(1);
+              }}
+              className="
+          w-10
+          h-10
+          rounded-full
+          bg-white/10
+          text-white
+          flex
+          items-center
+          justify-center
+        "
             >
-              <ArrowLeft size={18} />
+              <ArrowLeft size={20} />
             </button>
 
+
             <div className="text-white">
-              <p className="text-sm font-semibold">
+
+              <p className="font-semibold text-sm">
                 {profile?.full_name || "User"}
               </p>
+
               <p className="text-xs text-white/70">
-                @{username}
+                @{username || profile?.username}
               </p>
+
             </div>
+
           </div>
 
+
+
+          {/* IMAGE */}
           <img
             src={profile?.avatar_url}
-            style={{ transform: `scale(${zoom})` }}
-            onClick={() => setZoom((z) => Math.min(z + 0.3, 3))}
-            className="max-w-full max-h-full object-contain cursor-zoom-in transition-transform"
+            draggable="false"
+
+            onClick={(e) => {
+              e.stopPropagation();
+
+              setZoom((z) =>
+                z === 1 ? 2.5 : 1
+              );
+            }}
+
+            style={{
+              transform: `scale(${zoom})`,
+              maxHeight: "100vh",
+              maxWidth: "100vw"
+            }}
+
+            className="
+        relative
+        z-10
+        select-none
+        object-contain
+        transition-transform
+        duration-300
+      "
           />
+
         </div>
       )}
     </div>

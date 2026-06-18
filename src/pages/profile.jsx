@@ -96,6 +96,8 @@ export default function ProfilePage() {
     return () => subscription.unsubscribe();
   }, []);
 
+  console.log(profile)
+
   // ================= IMAGE COMPRESSION =================
   const compressImage = (
     file,
@@ -351,7 +353,7 @@ export default function ProfilePage() {
                 <img
                   src={
                     profile?.avatar_url ||
-                    `https://ui-avatars.com/api/?name=${user?.user_metadata?.full_name}`
+                    `https://ui-avatars.com/api/?name=${me?.user_metadata?.full_name}`
                   }
                   className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-lg"
                 />

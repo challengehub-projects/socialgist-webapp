@@ -157,7 +157,7 @@ export default function PublicProfilePage() {
 
         </div>
 
-        <div className="space-y-3 text-sm text-gray-700">
+        <div className="space-y-3 text-sm text-gray-700 mt-7">
 
           {!profile.location &&
             !profile.school &&

@@ -10,354 +10,739 @@ import {
 import { nanoid } from "nanoid";
 import { useNavigate } from "react-router-dom";
 
-export default function SeetingsPage({ onBack }) {
+export default function SeetingsPage() {
+
   const [profile, setProfile] = useState(null);
   const [editing, setEditing] = useState({});
   const [loading, setLoading] = useState(true);
+
   const navigate = useNavigate();
 
 
-  // FETCH PROFILE
+  // ================= FETCH =================
   useEffect(() => {
+
     const fetchProfile = async () => {
+
       try {
+
         setLoading(true);
 
         const {
           data: { user },
         } = await supabase.auth.getUser();
 
+
         if (!user) {
           setProfile(null);
-          setLoading(false);
           return;
         }
 
+
         const cacheKey = `profile-${user.id}`;
 
-        // Try user-specific cache first
         const cached = sessionStorage.getItem(cacheKey);
 
         if (cached) {
-          const parsed = JSON.parse(cached);
-
-          setProfile(parsed);
+          setProfile(JSON.parse(cached));
         }
 
-        // Always fetch fresh data from Supabase
+
         const { data, error } = await supabase
           .from("profiles")
           .select("*")
           .eq("id", user.id)
           .single();
 
+
         if (error) {
           console.error(error);
-          setLoading(false);
           return;
         }
 
-        let updatedProfile = { ...data };
 
+        let updatedProfile = {
+          ...data,
+        };
+
+
+        // create username if missing
         if (!updatedProfile.username) {
-          const username = `user_${nanoid(6)}`;
+
+          const username =
+            `user_${nanoid(6)}`;
+
 
           await supabase
             .from("profiles")
-            .update({ username })
+            .update({
+              username,
+            })
             .eq("id", user.id);
+
 
           updatedProfile.username = username;
         }
 
+
         setProfile(updatedProfile);
+
 
         sessionStorage.setItem(
           cacheKey,
           JSON.stringify(updatedProfile)
         );
 
-        console.log("Loaded profile:", updatedProfile);
-      } catch (err) {
+
+      } catch(err){
+
         console.error(err);
+
       } finally {
+
         setLoading(false);
+
       }
     };
+
 
     fetchProfile();
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN") {
-        fetchProfile();
-      }
 
-      if (event === "SIGNED_OUT") {
-        sessionStorage.clear();
-        setProfile(null);
-      }
+    const {
+      data:{subscription},
+    } = supabase.auth.onAuthStateChange(()=>{
+      fetchProfile();
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
 
-  const updateField = async (field, value) => {
-    const { data: authData } = await supabase.auth.getUser();
-    const userId = authData?.user?.id;
+    return ()=>subscription.unsubscribe();
 
-    const updated = { ...profile, [field]: value };
-    setProfile(updated);
 
-    await supabase
-      .from("profiles")
-      .update({ [field]: value, updated_at: new Date() })
-      .eq("id", userId);
-  };
+  },[]);
 
-  const toggleEdit = (field) => {
-    setEditing((prev) => ({ ...prev, [field]: !prev[field] }));
-  };
 
-  const compressImage = (file, maxWidth = 600, quality = 0.7) => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      const reader = new FileReader();
 
-      reader.readAsDataURL(file);
-      reader.onload = (e) => (img.src = e.target.result);
+  // ================= UPDATE =================
 
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
+  const updateField = async (field,value)=>{
 
-        let width = img.width;
-        let height = img.height;
+    try{
 
-        if (width > maxWidth) {
-          height = (height * maxWidth) / width;
-          width = maxWidth;
+
+      const {
+        data:{user},
+      } = await supabase.auth.getUser();
+
+
+
+      if(!user) return;
+
+
+
+      const updated = {
+        ...profile,
+        [field]:value,
+      };
+
+
+      setProfile(updated);
+
+
+
+      // 🔥 FULLNAME -> AUTH METADATA
+
+      if(field === "full_name"){
+
+
+        const {error} =
+          await supabase.auth.updateUser({
+
+            data:{
+              full_name:value,
+            }
+
+          });
+
+
+
+        if(error){
+          console.error(error);
+          return;
         }
 
-        canvas.width = width;
-        canvas.height = height;
 
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, width, height);
 
-        canvas.toBlob((blob) => {
-          resolve(
-            new File([blob], file.name, {
-              type: "image/jpeg",
-            })
-          );
-        }, "image/jpeg", quality);
-      };
-    });
-  };
+        sessionStorage.setItem(
+          `profile-${user.id}`,
+          JSON.stringify(updated)
+        );
 
-  const uploadAvatar = async (file) => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
 
-    if (!file || !user) return;
+        console.log(
+          "✅ fullname updated in auth"
+        );
 
-    const compressed = await compressImage(file);
 
-    const fileName = `${user.id}/${Date.now()}.jpg`;
+        return;
 
-    const { error: uploadError } = await supabase.storage
-      .from("profile-images")
-      .upload(fileName, compressed);
+      }
 
-    if (uploadError) {
-      console.error(uploadError);
-      return;
+
+
+      // OTHER FIELDS -> PROFILE TABLE
+
+      const {error} =
+        await supabase
+        .from("profiles")
+        .update({
+
+          [field]:value,
+
+          updated_at:
+          new Date().toISOString()
+
+        })
+        .eq("id",user.id);
+
+
+
+      if(error){
+        console.error(error);
+      }
+
+
+
+      sessionStorage.setItem(
+        `profile-${user.id}`,
+        JSON.stringify(updated)
+      );
+
+
+
+    }catch(err){
+
+      console.error(err);
+
     }
 
-    const { data } = supabase.storage
+  };
+
+
+
+  const toggleEdit=(field)=>{
+
+    setEditing(prev=>({
+      ...prev,
+      [field]:!prev[field]
+    }));
+
+  };
+
+
+
+  // ================= IMAGE =================
+
+  const compressImage=(file)=>{
+
+    return new Promise(resolve=>{
+
+      const img=new Image();
+
+      const reader=new FileReader();
+
+
+      reader.onload=e=>{
+        img.src=e.target.result;
+      };
+
+
+      reader.readAsDataURL(file);
+
+
+
+      img.onload=()=>{
+
+        const canvas =
+        document.createElement("canvas");
+
+
+        const size=600;
+
+
+        canvas.width=size;
+        canvas.height=size;
+
+
+
+        const ctx =
+        canvas.getContext("2d");
+
+
+        ctx.drawImage(
+          img,
+          0,
+          0,
+          size,
+          size
+        );
+
+
+        canvas.toBlob(blob=>{
+
+          resolve(
+            new File(
+              [blob],
+              file.name,
+              {
+                type:"image/jpeg"
+              }
+            )
+          );
+
+        },"image/jpeg",0.7);
+
+      };
+
+    });
+
+  };
+
+
+
+  const uploadAvatar=async(file)=>{
+
+
+    try{
+
+
+      const {
+        data:{user},
+      }=await supabase.auth.getUser();
+
+
+
+      if(!user || !file)return;
+
+
+
+      const image =
+      await compressImage(file);
+
+
+
+      const fileName =
+      `${user.id}/${Date.now()}.jpg`;
+
+
+
+      const {error} =
+      await supabase.storage
+      .from("profile-images")
+      .upload(
+        fileName,
+        image,
+        {
+          upsert:true,
+          contentType:"image/jpeg"
+        }
+      );
+
+
+
+      if(error){
+        console.error(error);
+        return;
+      }
+
+
+
+      const {data} =
+      supabase.storage
       .from("profile-images")
       .getPublicUrl(fileName);
 
-    const avatarUrl = data.publicUrl;
 
-    const { error: updateError } = await supabase
+
+      const avatarUrl =
+      data.publicUrl;
+
+
+
+      await supabase
       .from("profiles")
       .update({
-        avatar_url: avatarUrl,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", user.id);
 
-    if (updateError) {
-      console.error(updateError);
-      return;
+        avatar_url:avatarUrl,
+
+        updated_at:
+        new Date().toISOString()
+
+      })
+      .eq("id",user.id);
+
+
+
+      setProfile(prev=>({
+
+        ...prev,
+        avatar_url:avatarUrl
+
+      }));
+
+
+    }catch(err){
+
+      console.error(err);
+
     }
 
-    const updatedProfile = {
-      ...profile,
-      avatar_url: avatarUrl,
-    };
+  };
 
-    setProfile(updatedProfile);
 
-    sessionStorage.setItem(
-      `profile-${user.id}`,
-      JSON.stringify(updatedProfile)
+
+  const regenerateUsername=async()=>{
+
+    updateField(
+      "username",
+      "user_"+nanoid(6)
     );
+
   };
 
-  const regenerateUsername = async () => {
-    await updateField("username", "user_" + nanoid(6));
-  };
 
-  if (loading) {
+
+  if(loading){
+
     return (
-      <div className="min-h-screen bg-black text-white animate-pulse p-6">
-        <div className="h-56 bg-purple-900/30 rounded-3xl" />
-        <div className="h-24 w-24 bg-purple-800/30 rounded-full -mt-12 ml-6 border-4 border-black" />
+      <div className="min-h-screen bg-white p-6 animate-pulse">
+
+        <div className="h-56 bg-gray-200 rounded-3xl"/>
+
+        <div className="h-24 w-24 bg-gray-300 rounded-full -mt-12 ml-6"/>
+
       </div>
     );
+
   }
 
 
-  console.log(profile)
 
-  if (!profile) {
+  if(!profile){
+
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black text-white">
+      <div className="min-h-screen bg-white flex items-center justify-center">
+
         No profile found
+
       </div>
     );
+
   }
 
-  const Field = ({ label, value, field }) => (
-    <div className="py-3 border-b border-white/10 flex justify-between items-start gap-4">
+
+
+  const Field=({label,value,field})=>(
+
+    <div className="py-4 border-b border-gray-200 flex justify-between">
+
+
       <div className="w-full">
-        <p className="text-[11px] text-purple-300 uppercase tracking-wider">
+
+        <p className="text-xs text-purple-600 uppercase">
+
           {label}
+
         </p>
 
+
+
         {editing[field] ? (
+
           <input
-            defaultValue={value || ""}
-            onBlur={(e) => {
-              updateField(field, e.target.value);
-              toggleEdit(field);
-            }}
-            className="w-full mt-1 bg-white/5 text-white px-3 py-2 rounded-xl outline-none"
+
             autoFocus
+
+            defaultValue={value || ""}
+
+            onBlur={(e)=>{
+
+              updateField(
+                field,
+                e.target.value
+              );
+
+              toggleEdit(field);
+
+            }}
+
+            className="
+            w-full mt-2
+            bg-gray-100
+            rounded-xl
+            px-3 py-2
+            outline-none
+            "
+
           />
-        ) : (
-          <p className="text-sm text-white mt-1">
+
+        ):(
+
+          <p className="mt-1">
+
             {value || "Not set"}
+
           </p>
+
         )}
+
       </div>
+
+
 
       <button
-        onClick={() => toggleEdit(field)}
-        className="text-purple-300 hover:text-white"
+      onClick={()=>toggleEdit(field)}
       >
-        {editing[field] ? <FiCheck /> : <FiEdit2 />}
+
+      {editing[field]
+      ? <FiCheck/>
+      : <FiEdit2/>
+      }
+
       </button>
+
+
     </div>
+
   );
+
+
+
 
   return (
-    <div className="min-h-screen bg-black text-white">
+
+    <div className="min-h-screen bg-white text-black">
+
+
       <div className="max-w-xl mx-auto pb-10">
 
-        {/* HEADER */}
-        <div className="flex items-center gap-3 px-4 py-4">
+
+
+        <div className="p-4 flex gap-3 items-center border-b">
+
           <button
-            onClick={() => navigate("/feed")}
-            className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center"
+          onClick={()=>navigate("/feed")}
+          className="bg-gray-100 p-3 rounded-full"
           >
-            <FiArrowLeft />
+
+          <FiArrowLeft/>
+
           </button>
 
+
           <div>
-            <h1 className="font-bold text-lg">Profile</h1>
-            <p className="text-xs text-purple-300">
-              @{profile.username}
-            </p>
+
+          <h1 className="font-bold">
+            Profile Settings
+          </h1>
+
+          <p className="text-xs text-gray-500">
+            @{profile.username}
+          </p>
+
+
           </div>
+
+
         </div>
 
-        {/* COVER IMAGE */}
-        <div className="relative h-56 mx-4 rounded-3xl overflow-hidden">
+
+
+
+        <div className="mx-4 mt-4 h-56 rounded-3xl overflow-hidden shadow">
+
+
           <img
-            src={profile.avatar_url}
-            className="w-full h-full object-cover"
+
+          src={
+            profile.avatar_url ||
+            `https://ui-avatars.com/api/?name=${profile.full_name}`
+          }
+
+          className="w-full h-full object-cover"
+
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+
+
         </div>
 
-        {/* PROFILE IMAGE FLOAT */}
-        <div className="flex items-end gap-4 px-6 -mt-14 relative z-10">
+
+
+
+        <div className="px-6 -mt-14 relative flex items-end gap-4">
+
+
           <div className="relative">
-            <img
-              src={
-                profile.avatar_url ||
-                `https://ui-avatars.com/api/?name=${profile.full_name}`
-              }
-              className="w-28 h-28 rounded-full border-4 border-black object-cover"
-            />
 
-            <label className="absolute bottom-2 right-2 bg-purple-600 p-2 rounded-full cursor-pointer">
-              <FiCamera size={14} />
-              <input
-                type="file"
-                hidden
-                onChange={(e) => uploadAvatar(e.target.files[0])}
-              />
-            </label>
+
+          <img
+
+          src={
+          profile.avatar_url ||
+          `https://ui-avatars.com/api/?name=${profile.full_name}`
+          }
+
+          className="
+          w-28 h-28
+          rounded-full
+          border-4
+          border-white
+          object-cover
+          shadow
+          "
+
+          />
+
+
+
+          <label className="
+          absolute bottom-2 right-2
+          bg-purple-600
+          text-white
+          p-2
+          rounded-full
+          ">
+
+          <FiCamera/>
+
+
+          <input
+
+          hidden
+
+          type="file"
+
+          accept="image/*"
+
+          capture="environment"
+
+          onChange={
+            e=>uploadAvatar(
+              e.target.files[0]
+            )
+          }
+
+          />
+
+
+          </label>
+
+
           </div>
 
-          <div className="pb-2">
-            <h2 className="text-xl font-bold">
-              {profile.full_name}
-            </h2>
 
-            <div className="flex items-center gap-2 text-purple-300 text-sm">
-              @{profile.username}
 
-              <button onClick={regenerateUsername}>
-                <FiRefreshCw size={12} />
-              </button>
-            </div>
+          <div>
+
+          <h2 className="text-xl font-bold">
+
+          {profile.full_name}
+
+          </h2>
+
+
+          <div className="flex gap-2 text-purple-600">
+
+          @{profile.username}
+
+
+          <button onClick={regenerateUsername}>
+
+          <FiRefreshCw size={13}/>
+
+          </button>
+
+
           </div>
+
+
+          </div>
+
+
         </div>
 
-        {/* STATS */}
-        <div className="grid grid-cols-3 gap-3 px-4 mt-6">
-          {["Posts", "Followers", "Following"].map((t, i) => (
-            <div
-              key={t}
-              className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center"
-            >
-              <p className="text-lg font-bold">
-                {[profile.posts_count, profile.followers_count, profile.following_count][i] || 0}
-              </p>
-              <p className="text-xs text-purple-300">{t}</p>
-            </div>
-          ))}
+
+
+
+
+        <div className="grid grid-cols-3 gap-3 p-4">
+
+        {["Posts","Followers","Following"].map((x,i)=>(
+
+          <div
+          key={x}
+          className="
+          border
+          rounded-2xl
+          p-4
+          text-center
+          "
+
+          >
+
+          <b>
+          {[
+          profile.posts_count,
+          profile.followers_count,
+          profile.following_count
+          ][i] || 0}
+          </b>
+
+          <p className="text-xs text-gray-500">
+          {x}
+          </p>
+
+          </div>
+
+        ))}
+
+
         </div>
 
-        {/* FIELDS */}
-        <div className="mt-6 mx-4 bg-white/5 border border-white/10 rounded-3xl p-4">
-          <Field label="Bio" field="bio" value={profile.bio} />
-          <Field label="Website" field="website" value={profile.website} />
-          <Field label="Location" field="location" value={profile.location} />
-          <Field label="School" field="school" value={profile.school} />
-          <Field label="Department" field="department" value={profile.department} />
-          <Field label="Hobby" field="hobby" value={profile.hobby} />
-          <Field label="Relationship" field="relationship_status" value={profile.relationship_status} />
+
+
+
+        <div className="mx-4 border rounded-3xl p-4">
+
+
+          <Field
+          label="Full Name"
+          field="full_name"
+          value={profile.full_name}
+          />
+
+
+          <Field label="Website" field="website" value={profile.website}/>
+
+          <Field label="Location" field="location" value={profile.location}/>
+
+          <Field label="School" field="school" value={profile.school}/>
+
+          <Field label="Department" field="department" value={profile.department}/>
+
+          <Field label="Hobby" field="hobby" value={profile.hobby}/>
+
+          <Field label="Relationship" field="relationship_status" value={profile.relationship_status}/>
+
+
         </div>
+
 
       </div>
+
+
     </div>
+
   );
+
 }
