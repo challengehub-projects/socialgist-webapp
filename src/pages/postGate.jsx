@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../configs/supbase";
 
 export default function PostGate() {
-  const { postId } = useParams();
+  const { id } = useParams(); // ✅ FIXED HERE
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
 
@@ -14,20 +14,18 @@ export default function PostGate() {
   }, []);
 
   const handleContinue = () => {
-    navigate(`/post/${postId}`);
+    navigate(`/post/${id}`);
   };
 
   const handleLogin = () => {
-    navigate(`/login?redirect=/post/${postId}`);
+    navigate(`/login?redirect=/post/${id}`);
   };
 
   return (
     <div className="gate-container">
       <h1>Join SocialGist</h1>
 
-      <p>
-        You’ve been invited to view a post. Join or log in to continue.
-      </p>
+      <p>You’ve been invited to view a post.</p>
 
       {!user ? (
         <>

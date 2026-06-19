@@ -146,6 +146,8 @@ export default function App() {
           }
         />
 
+        
+
         {/* OLD SINGLE POST (keep if needed) */}
         <Route path="/post/:id" element={<SinglePost />} />
 
