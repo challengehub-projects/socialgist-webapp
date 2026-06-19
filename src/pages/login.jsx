@@ -35,15 +35,7 @@ export default function LoginPage({ onNavigate }) {
 
       onNavigate("feed");
 
-      useEffect(() => {
-        const setupPush = async () => {
-          if (!me?.id) return;
-
-          await OneSignal.login(me.id);
-        };
-
-        setupPush();
-      }, [me]);
+      
     } catch (err) {
       setError("Invalid login credentials");
     } finally {

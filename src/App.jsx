@@ -1,5 +1,3 @@
-// ================= APP.JSX =================
-
 import React, { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { supabase } from "./configs/supbase";
@@ -18,19 +16,20 @@ import PublicProfilePage from "./pages/publicProfile";
 import SinglePost from "./pages/singlepost";
 import SettingsPage from "./pages/settings";
 
+// 🔥 NEW PAGES
+import PostGate from "./pages/postGate";
+import PostPage from "./pages/post";
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showSplash, setShowSplash] = useState(true);
-
-
 
   // ================= SPLASH =================
   useEffect(() => {
     const timer = setTimeout(() => setShowSplash(false), 2000);
     return () => clearTimeout(timer);
   }, []);
-
 
   // ================= AUTH =================
   useEffect(() => {
@@ -45,136 +44,6 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-
-  // ================= ONESIGNAL NOTIFICATIONS =================
-  useEffect(() => {
-
-    window.OneSignalDeferred =
-      window.OneSignalDeferred || [];
-
-
-    window.OneSignalDeferred.push(async (OneSignal) => {
-
-      try {
-
-        console.log("🔥 OneSignal ready");
-
-
-        // Ask browser permission
-        if (!OneSignal.Notifications.permission) {
-
-          await OneSignal.Notifications.requestPermission();
-
-        }
-
-
-        console.log(
-          "🔔 Permission:",
-          OneSignal.Notifications.permission
-        );
-
-
-        if (!OneSignal.Notifications.permission) {
-          console.log("❌ Notifications blocked");
-          return;
-        }
-
-
-        // Get logged user
-        const {
-          data: {
-            user
-          }
-        } = await supabase.auth.getUser();
-
-
-        if (!user) {
-          console.log("No user");
-          return;
-        }
-
-
-        // connect OneSignal user
-        await OneSignal.login(user.id);
-
-
-        // make sure subscription exists
-        await OneSignal.User.PushSubscription.optIn();
-
-
-        const subscriptionId =
-          OneSignal.User.PushSubscription.id;
-
-
-        console.log(
-          "🔥 Subscription ID:",
-          subscriptionId
-        );
-
-
-        console.log(
-          "🔥 OneSignal User:",
-          OneSignal.User.onesignalId
-        );
-
-
-        // save subscription to supabase
-        if (subscriptionId) {
-
-          await supabase
-            .from("profiles")
-            .update({
-              onesignal_subscription_id: subscriptionId
-            })
-            .eq(
-              "id",
-              user.id
-            );
-
-
-          console.log(
-            "✅ Subscription saved"
-          );
-        }
-
-
-      } catch (err) {
-
-        console.error(
-          "OneSignal setup error:",
-          err
-        );
-
-      }
-
-    });
-
-
-  }, [session]);
-
-
-
-  useEffect(() => {
-
-window.OneSignalDeferred.push(async (OneSignal)=>{
-
-console.log("OBJECT", OneSignal);
-
-console.log(
-"permission",
-OneSignal.Notifications.permission
-);
-
-console.log(
-"subscription",
-OneSignal.User.PushSubscription
-);
-
-});
-
-}, []);
-
-
   const checkSession = async () => {
     const {
       data: { session },
@@ -184,11 +53,8 @@ OneSignal.User.PushSubscription
     setLoading(false);
   };
 
-
-
-
   // ================= SPLASH UI =================
-  if (showSplash) {
+  if (showSplash || loading) {
     return (
       <div className="h-screen bg-white flex items-center justify-center">
         <div className="flex flex-col items-center">
@@ -201,17 +67,13 @@ OneSignal.User.PushSubscription
     );
   }
 
-  // ================= LOADING UI =================
-  if (loading) {
+  // ================= POST WRAPPER =================
+  function PostPageWrapper() {
     return (
-      <div className="h-screen bg-white flex items-center justify-center">
-        <div className="flex flex-col items-center">
-          <img src="/icon.png" className="w-24 h-24 animate-pulse" />
-          <h1 className="mt-4 text-2xl font-black text-purple-700">
-            SocialGist
-          </h1>
-        </div>
-      </div>
+      <>
+        {session && <TopNavbar />}
+        <PostPage />
+      </>
     );
   }
 
@@ -220,7 +82,7 @@ OneSignal.User.PushSubscription
     <BrowserRouter>
       <Routes>
 
-        {/* PUBLIC ROUTES */}
+        {/* PUBLIC ROOT */}
         <Route
           path="/"
           element={
@@ -228,6 +90,7 @@ OneSignal.User.PushSubscription
           }
         />
 
+        {/* AUTH */}
         <Route
           path="/login"
           element={
@@ -242,7 +105,7 @@ OneSignal.User.PushSubscription
           }
         />
 
-        {/* PROTECTED ROUTES */}
+        {/* MAIN FEED */}
         <Route
           path="/feed"
           element={
@@ -257,6 +120,7 @@ OneSignal.User.PushSubscription
           }
         />
 
+        {/* MESSAGES */}
         <Route
           path="/messages"
           element={
@@ -264,6 +128,7 @@ OneSignal.User.PushSubscription
           }
         />
 
+        {/* PROFILES */}
         <Route path="/profile/:id" element={<PublicProfilePage />} />
 
         <Route
@@ -273,7 +138,7 @@ OneSignal.User.PushSubscription
           }
         />
 
-
+        {/* SETTINGS */}
         <Route
           path="/settings"
           element={
@@ -281,15 +146,14 @@ OneSignal.User.PushSubscription
           }
         />
 
+        {/* OLD SINGLE POST (keep if needed) */}
         <Route path="/post/:id" element={<SinglePost />} />
 
-        <Route
-          path="/profile-modal"
-          element={
-            session ? <ProfileModal /> : <Navigate to="/" />
-          }
-        />
+        {/* 🔥 NEW: SHARE GATE PAGE */}
+        <Route path="/p/:id" element={<PostGate />} />
 
+
+        {/* NOTIFICATIONS */}
         <Route
           path="/notifications"
           element={
