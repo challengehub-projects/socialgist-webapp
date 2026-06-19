@@ -13,7 +13,6 @@ import ProfilePage from "./pages/profile";
 import ProfileModal from "./pages/profileModal";
 import NotificationsPage from "./pages/notifications";
 import PublicProfilePage from "./pages/publicProfile";
-import SinglePost from "./pages/singlepost";
 import SettingsPage from "./pages/settings";
 
 // 🔥 NEW PAGES
@@ -149,7 +148,7 @@ export default function App() {
         
 
         {/* OLD SINGLE POST (keep if needed) */}
-        <Route path="/post/:id" element={<SinglePost />} />
+        <Route path="/post/:id" element={<PostPage />} />
 
         {/* 🔥 NEW: SHARE GATE PAGE */}
         <Route path="/p/:id" element={<PostGate />} />
