@@ -386,7 +386,7 @@ export default function ProfilePage() {
 
                 <h2 className="text-3xl font-bold">
 
-                  {me?.user_metadata?.full_name ||
+                  {profile.full_name ||
                     "Anonymous User"}
 
                 </h2>
@@ -410,7 +410,7 @@ export default function ProfilePage() {
                   onClick={() => navigate("/settings")}
                   className="mt-5 px-5 py-2 rounded-xl bg-black text-white"
                 >
-                  Edit Profile
+                 Update Profile
                 </button>
 
 

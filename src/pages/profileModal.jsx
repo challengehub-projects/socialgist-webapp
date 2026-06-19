@@ -13,7 +13,7 @@ export default function ProfileModal({
   const [imageOpen, setImageOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
 
- 
+
 
   const navigate = useNavigate();
 
@@ -23,7 +23,7 @@ export default function ProfileModal({
   const isOwnProfile =
     currentUserProfileId && profile?.id === currentUserProfileId;
 
-/*   console.log(currentUserProfileId, profile?.id) */
+  /*   console.log(currentUserProfileId, profile?.id) */
 
   // ================= ESC CLOSE =================
   useEffect(() => {
@@ -173,33 +173,22 @@ export default function ProfileModal({
               </button>
             ) : (
               <>
-             {/*    <button
+                <button
                   onClick={() => {
                     const willFollow = !isFollowing;
-
-                    onFollowToggle?.(profile);
+                    onFollowToggle?.(profile, willFollow);
                   }}
                   className={`
-                flex-1 h-12 rounded-2xl font-semibold shadow-md
-                transition active:scale-95
-                ${isFollowing
+    flex-1 h-12 rounded-2xl font-semibold shadow-md
+    transition active:scale-95
+    ${isFollowing
                       ? "bg-gray-200 text-gray-800"
-                      : "bg-purple-600 text-white"}
-              `}
+                      : "bg-purple-600 text-white"
+                    }
+  `}
                 >
                   {isFollowing ? "Following" : "Follow"}
-                </button> */}
-
-              <button
- onClick={() => {
-   onFollowToggle?.(profile);
- }}
-  className="
-                flex-1 h-12 rounded-2xl font-semibold shadow-md
-                transition active:scale-95"
->
- {isFollowing ? "Following" : "Follow"}
-</button>
+                </button>
 
                 <button
                   onClick={() => navigate(`/profile/${profile.id}`)}

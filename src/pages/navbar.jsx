@@ -645,7 +645,7 @@ export default function TopNavbar({
       /*   await showToast(
           "Create something to post!"
         ); */
-      console.log("hello")
+     
 
       return;
     }
@@ -737,7 +737,7 @@ export default function TopNavbar({
 
       const url = await getProfilePicture();
 
-
+      console.log(userData.user.user_metadata?.full_name)
       const payload = {
         user_id: userData.user.id,
         profile_name: userData.user.user_metadata?.full_name || "Anonymous",

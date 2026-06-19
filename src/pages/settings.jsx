@@ -10,739 +10,286 @@ import {
 import { nanoid } from "nanoid";
 import { useNavigate } from "react-router-dom";
 
-export default function SeetingsPage() {
-
+export default function SettingsPage() {
   const [profile, setProfile] = useState(null);
   const [editing, setEditing] = useState({});
   const [loading, setLoading] = useState(true);
 
   const navigate = useNavigate();
 
-
   // ================= FETCH =================
-  useEffect(() => {
+  const fetchProfile = async () => {
+    try {
+      setLoading(true);
 
-    const fetchProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-      try {
+      console.log(user)
 
-        setLoading(true);
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
 
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+      if (error) throw error;
 
+      // ensure username exists
+      let updated = { ...data };
 
-        if (!user) {
-          setProfile(null);
-          return;
-        }
+      if (!updated.username) {
+        updated.username = "user_" + nanoid(6);
 
-
-        const cacheKey = `profile-${user.id}`;
-
-        const cached = sessionStorage.getItem(cacheKey);
-
-        if (cached) {
-          setProfile(JSON.parse(cached));
-        }
-
-
-        const { data, error } = await supabase
+        await supabase
           .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .single();
-
-
-        if (error) {
-          console.error(error);
-          return;
-        }
-
-
-        let updatedProfile = {
-          ...data,
-        };
-
-
-        // create username if missing
-        if (!updatedProfile.username) {
-
-          const username =
-            `user_${nanoid(6)}`;
-
-
-          await supabase
-            .from("profiles")
-            .update({
-              username,
-            })
-            .eq("id", user.id);
-
-
-          updatedProfile.username = username;
-        }
-
-
-        setProfile(updatedProfile);
-
-
-        sessionStorage.setItem(
-          cacheKey,
-          JSON.stringify(updatedProfile)
-        );
-
-
-      } catch(err){
-
-        console.error(err);
-
-      } finally {
-
-        setLoading(false);
-
+          .update({ username: updated.username })
+          .eq("id", user.id);
       }
-    };
 
+      setProfile(updated);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchProfile();
+  }, []);
 
-
-    const {
-      data:{subscription},
-    } = supabase.auth.onAuthStateChange(()=>{
+  // 🚀 NO auth refresh loops (IMPORTANT FIX)
+  useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange(() => {
+      // only refetch if real logout/login happens
       fetchProfile();
     });
 
+    return () => data.subscription.unsubscribe();
+  }, []);
 
-    return ()=>subscription.unsubscribe();
+  // ================= UPDATE FIELD =================
+  const updateField = async (field, value) => {
+    if (!profile) return;
 
+    const userValue = value?.trim() || "Not set";
 
-  },[]);
+    // optimistic UI update
+    const updated = {
+      ...profile,
+      [field]: userValue,
+    };
 
+    setProfile(updated);
 
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
-  // ================= UPDATE =================
-
-  const updateField = async (field,value)=>{
-
-    try{
-
-
-      const {
-        data:{user},
-      } = await supabase.auth.getUser();
-
-
-
-      if(!user) return;
-
-
-
-      const updated = {
-        ...profile,
-        [field]:value,
-      };
-
-
-      setProfile(updated);
-
-
-
-      // 🔥 FULLNAME -> AUTH METADATA
-
-      if(field === "full_name"){
-
-
-        const {error} =
-          await supabase.auth.updateUser({
-
-            data:{
-              full_name:value,
-            }
-
-          });
-
-
-
-        if(error){
-          console.error(error);
-          return;
-        }
-
-
-
-        sessionStorage.setItem(
-          `profile-${user.id}`,
-          JSON.stringify(updated)
-        );
-
-
-        console.log(
-          "✅ fullname updated in auth"
-        );
-
-
-        return;
-
-      }
-
-
-
-      // OTHER FIELDS -> PROFILE TABLE
-
-      const {error} =
-        await supabase
+    try {
+      const { error } = await supabase
         .from("profiles")
         .update({
-
-          [field]:value,
-
-          updated_at:
-          new Date().toISOString()
-
+          [field]: userValue,
+          updated_at: new Date().toISOString(),
         })
-        .eq("id",user.id);
+        .eq("id", user.id);
 
-
-
-      if(error){
-        console.error(error);
-      }
-
-
-
-      sessionStorage.setItem(
-        `profile-${user.id}`,
-        JSON.stringify(updated)
-      );
-
-
-
-    }catch(err){
-
+      if (error) throw error;
+    } catch (err) {
       console.error(err);
-
     }
-
   };
 
-
-
-  const toggleEdit=(field)=>{
-
-    setEditing(prev=>({
+  const toggleEdit = (field) => {
+    setEditing((prev) => ({
       ...prev,
-      [field]:!prev[field]
+      [field]: !prev[field],
     }));
-
   };
 
+  // ================= AVATAR =================
+  const uploadAvatar = async (file) => {
+    if (!file) return;
 
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
-  // ================= IMAGE =================
+    const fileName = `${user.id}/${Date.now()}.jpg`;
 
-  const compressImage=(file)=>{
-
-    return new Promise(resolve=>{
-
-      const img=new Image();
-
-      const reader=new FileReader();
-
-
-      reader.onload=e=>{
-        img.src=e.target.result;
-      };
-
-
-      reader.readAsDataURL(file);
-
-
-
-      img.onload=()=>{
-
-        const canvas =
-        document.createElement("canvas");
-
-
-        const size=600;
-
-
-        canvas.width=size;
-        canvas.height=size;
-
-
-
-        const ctx =
-        canvas.getContext("2d");
-
-
-        ctx.drawImage(
-          img,
-          0,
-          0,
-          size,
-          size
-        );
-
-
-        canvas.toBlob(blob=>{
-
-          resolve(
-            new File(
-              [blob],
-              file.name,
-              {
-                type:"image/jpeg"
-              }
-            )
-          );
-
-        },"image/jpeg",0.7);
-
-      };
-
-    });
-
-  };
-
-
-
-  const uploadAvatar=async(file)=>{
-
-
-    try{
-
-
-      const {
-        data:{user},
-      }=await supabase.auth.getUser();
-
-
-
-      if(!user || !file)return;
-
-
-
-      const image =
-      await compressImage(file);
-
-
-
-      const fileName =
-      `${user.id}/${Date.now()}.jpg`;
-
-
-
-      const {error} =
-      await supabase.storage
+    const { error } = await supabase.storage
       .from("profile-images")
-      .upload(
-        fileName,
-        image,
-        {
-          upsert:true,
-          contentType:"image/jpeg"
-        }
-      );
+      .upload(fileName, file, {
+        upsert: true,
+      });
 
+    if (error) return console.error(error);
 
-
-      if(error){
-        console.error(error);
-        return;
-      }
-
-
-
-      const {data} =
-      supabase.storage
+    const { data } = supabase.storage
       .from("profile-images")
       .getPublicUrl(fileName);
 
+    const avatar_url = data.publicUrl;
 
-
-      const avatarUrl =
-      data.publicUrl;
-
-
-
-      await supabase
+    await supabase
       .from("profiles")
       .update({
-
-        avatar_url:avatarUrl,
-
-        updated_at:
-        new Date().toISOString()
-
+        avatar_url,
+        updated_at: new Date().toISOString(),
       })
-      .eq("id",user.id);
+      .eq("id", user.id);
 
-
-
-      setProfile(prev=>({
-
-        ...prev,
-        avatar_url:avatarUrl
-
-      }));
-
-
-    }catch(err){
-
-      console.error(err);
-
-    }
-
+    setProfile((p) => ({ ...p, avatar_url }));
   };
 
-
-
-  const regenerateUsername=async()=>{
-
-    updateField(
-      "username",
-      "user_"+nanoid(6)
-    );
-
+  const regenerateUsername = () => {
+    updateField("username", "user_" + nanoid(6));
   };
 
-
-
-  if(loading){
-
+  // ================= LOADING =================
+  if (loading) {
     return (
       <div className="min-h-screen bg-white p-6 animate-pulse">
-
-        <div className="h-56 bg-gray-200 rounded-3xl"/>
-
-        <div className="h-24 w-24 bg-gray-300 rounded-full -mt-12 ml-6"/>
-
+        <div className="h-56 bg-gray-200 rounded-3xl" />
+        <div className="h-24 w-24 bg-gray-300 rounded-full -mt-12 ml-6" />
       </div>
     );
-
   }
 
-
-
-  if(!profile){
-
+  if (!profile) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-
+      <div className="min-h-screen flex items-center justify-center">
         No profile found
-
       </div>
     );
-
   }
 
-
-
-  const Field=({label,value,field})=>(
-
-    <div className="py-4 border-b border-gray-200 flex justify-between">
-
-
+  // ================= FIELD =================
+  const Field = ({ label, value, field }) => (
+    <div className="py-4 border-b flex justify-between">
       <div className="w-full">
-
-        <p className="text-xs text-purple-600 uppercase">
-
-          {label}
-
-        </p>
-
-
+        <p className="text-xs text-purple-600 uppercase">{label}</p>
 
         {editing[field] ? (
-
           <input
-
             autoFocus
-
             defaultValue={value || ""}
-
-            onBlur={(e)=>{
-
-              updateField(
-                field,
-                e.target.value
-              );
-
+            onBlur={(e) => {
+              updateField(field, e.target.value);
               toggleEdit(field);
-
             }}
-
-            className="
-            w-full mt-2
-            bg-gray-100
-            rounded-xl
-            px-3 py-2
-            outline-none
-            "
-
+            className="w-full mt-2 bg-gray-100 rounded-xl px-3 py-2 outline-none"
           />
-
-        ):(
-
-          <p className="mt-1">
-
-            {value || "Not set"}
-
+        ) : (
+          <p className="mt-1 text-gray-700">
+            {value?.trim() || "Not set"}
           </p>
-
         )}
-
       </div>
 
-
-
-      <button
-      onClick={()=>toggleEdit(field)}
-      >
-
-      {editing[field]
-      ? <FiCheck/>
-      : <FiEdit2/>
-      }
-
+      <button onClick={() => toggleEdit(field)}>
+        {editing[field] ? <FiCheck /> : <FiEdit2 />}
       </button>
-
-
     </div>
-
   );
 
-
-
-
+  // ================= UI =================
   return (
-
     <div className="min-h-screen bg-white text-black">
-
-
       <div className="max-w-xl mx-auto pb-10">
 
-
-
-        <div className="p-4 flex gap-3 items-center border-b">
-
+        {/* HEADER */}
+        <div className="p-4 flex items-center gap-3 border-b">
           <button
-          onClick={()=>navigate("/feed")}
-          className="bg-gray-100 p-3 rounded-full"
+            onClick={() => navigate("/feed")}
+            className="bg-gray-100 p-3 rounded-full"
           >
-
-          <FiArrowLeft/>
-
+            <FiArrowLeft />
           </button>
 
-
           <div>
-
-          <h1 className="font-bold">
-            Profile Settings
-          </h1>
-
-          <p className="text-xs text-gray-500">
-            @{profile.username}
-          </p>
-
-
+            <h1 className="font-bold">Profile Settings</h1>
+            <p className="text-xs text-gray-500">
+              @{profile.username}
+            </p>
           </div>
-
-
         </div>
 
-
-
-
-        <div className="mx-4 mt-4 h-56 rounded-3xl overflow-hidden shadow">
-
-
+        {/* AVATAR */}
+        <div className="mx-4 mt-4 h-56 rounded-3xl overflow-hidden">
           <img
-
-          src={
-            profile.avatar_url ||
-            `https://ui-avatars.com/api/?name=${profile.full_name}`
-          }
-
-          className="w-full h-full object-cover"
-
+            src={
+              profile.avatar_url ||
+              `https://ui-avatars.com/api/?name=${profile.full_name}`
+            }
+            className="w-full h-full object-cover"
           />
-
-
         </div>
 
-
-
-
-        <div className="px-6 -mt-14 relative flex items-end gap-4">
-
+        {/* PROFILE INFO */}
+        <div className="px-6 -mt-14 flex items-end gap-4">
 
           <div className="relative">
+            <img
+              src={
+                profile.avatar_url ||
+                `https://ui-avatars.com/api/?name=${profile.full_name}`
+              }
+              className="w-28 h-28 rounded-full border-4 border-white object-cover"
+            />
 
-
-          <img
-
-          src={
-          profile.avatar_url ||
-          `https://ui-avatars.com/api/?name=${profile.full_name}`
-          }
-
-          className="
-          w-28 h-28
-          rounded-full
-          border-4
-          border-white
-          object-cover
-          shadow
-          "
-
-          />
-
-
-
-          <label className="
-          absolute bottom-2 right-2
-          bg-purple-600
-          text-white
-          p-2
-          rounded-full
-          ">
-
-          <FiCamera/>
-
-
-          <input
-
-          hidden
-
-          type="file"
-
-          accept="image/*"
-
-          capture="environment"
-
-          onChange={
-            e=>uploadAvatar(
-              e.target.files[0]
-            )
-          }
-
-          />
-
-
-          </label>
-
-
+            <label className="absolute bottom-2 right-2 bg-purple-600 text-white p-2 rounded-full">
+              <FiCamera />
+              <input
+                hidden
+                type="file"
+                onChange={(e) => uploadAvatar(e.target.files[0])}
+              />
+            </label>
           </div>
-
-
 
           <div>
+            <h2 className="text-xl font-bold">
+              {profile.full_name || "Your Name"}
+            </h2>
 
-          <h2 className="text-xl font-bold">
-
-          {profile.full_name}
-
-          </h2>
-
-
-          <div className="flex gap-2 text-purple-600">
-
-          @{profile.username}
-
-
-          <button onClick={regenerateUsername}>
-
-          <FiRefreshCw size={13}/>
-
-          </button>
-
-
+            <div className="flex gap-2 text-purple-600">
+              @{profile.username}
+              <button onClick={regenerateUsername}>
+                <FiRefreshCw size={13} />
+              </button>
+            </div>
           </div>
-
-
-          </div>
-
-
         </div>
 
-
-
-
-
+        {/* STATS */}
         <div className="grid grid-cols-3 gap-3 p-4">
-
-        {["Posts","Followers","Following"].map((x,i)=>(
-
-          <div
-          key={x}
-          className="
-          border
-          rounded-2xl
-          p-4
-          text-center
-          "
-
-          >
-
-          <b>
-          {[
-          profile.posts_count,
-          profile.followers_count,
-          profile.following_count
-          ][i] || 0}
-          </b>
-
-          <p className="text-xs text-gray-500">
-          {x}
-          </p>
-
-          </div>
-
-        ))}
-
-
+          {["Posts", "Followers", "Following"].map((x, i) => (
+            <div key={x} className="border rounded-2xl p-4 text-center">
+              <b>
+                {[
+                  profile.posts_count,
+                  profile.followers_count,
+                  profile.following_count,
+                ][i] || 0}
+              </b>
+              <p className="text-xs text-gray-500">{x}</p>
+            </div>
+          ))}
         </div>
 
-
-
-
+        {/* FIELDS */}
         <div className="mx-4 border rounded-3xl p-4">
-
-
-          <Field
-          label="Full Name"
-          field="full_name"
-          value={profile.full_name}
-          />
-
-
-          <Field label="Website" field="website" value={profile.website}/>
-
-          <Field label="Location" field="location" value={profile.location}/>
-
-          <Field label="School" field="school" value={profile.school}/>
-
-          <Field label="Department" field="department" value={profile.department}/>
-
-          <Field label="Hobby" field="hobby" value={profile.hobby}/>
-
-          <Field label="Relationship" field="relationship_status" value={profile.relationship_status}/>
-
-
+          <Field label="Full Name" field="full_name" value={profile.full_name} />
+          <Field label="Website" field="website" value={profile.website} />
+          <Field label="Location" field="location" value={profile.location} />
+          <Field label="School" field="school" value={profile.school} />
+          <Field label="Department" field="department" value={profile.department} />
+          <Field label="Hobby" field="hobby" value={profile.hobby} />
+          <Field label="Relationship" field="relationship_status" value={profile.relationship_status} />
         </div>
-
 
       </div>
-
-
     </div>
-
   );
-
 }

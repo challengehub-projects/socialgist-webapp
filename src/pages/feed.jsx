@@ -26,6 +26,7 @@ import { sendNotification } from "../utils/sendNotifications";
 import ProfileModal from "./profileModal";
 import { toPng } from "html-to-image";
 import { data } from "react-router-dom";
+import { createNotification } from "../utils/createNotifications";
 /* import Share from "@capacitor/share"; */
 
 
@@ -770,9 +771,12 @@ export default function Feed({
             const newLikes = newRow?.likes_count || 0;
 
             if (newLikes > oldLikes && newRow.user_id === me?.id) {
-              await sendNotification({
-                title: "❤️ SocialGist",
-                body: "Someone liked your post",
+              await createNotification({
+                receiver_id: post.user_id, // User A
+                sender: user,              // User B
+                type: "like",
+                message: "liked your post ❤️",
+                post_id: post.id,
               });
             }
 
@@ -780,9 +784,12 @@ export default function Feed({
             const newShares = newRow?.shares_count || 0;
 
             if (newShares > oldShares && newRow.user_id === me?.id) {
-              await sendNotification({
-                title: "📤 SocialGist",
-                body: "Someone shared your post",
+              await createNotification({
+                receiver_id: post.user_id,
+                sender: user,
+                type: "share",
+                message: "shared your post 🔁",
+                post_id: post.id,
               });
             }
 
@@ -790,9 +797,12 @@ export default function Feed({
             const newComments = newRow?.comments_count || 0;
 
             if (newComments > oldComments && newRow.user_id === me?.id) {
-              await sendNotification({
-                title: "💬 SocialGist",
-                body: "Someone commented on your post",
+              await createNotification({
+                receiver_id: post.user_id,
+                sender: user,
+                type: "comment",
+                message: "commented on your post 💬",
+                post_id: post.id,
               });
             }
 
@@ -1325,6 +1335,7 @@ export default function Feed({
         {/* POSTS */}
         {posts.map((post) => {
           const parsed = post.content || {};
+          console.log(post)
           return (
             <div
               id={`post-${post.id}`}

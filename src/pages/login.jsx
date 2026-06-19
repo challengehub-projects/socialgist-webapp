@@ -26,18 +26,39 @@ export default function LoginPage({ onNavigate }) {
     setError("");
 
     try {
+      if (!email || !password) {
+        throw new Error("Please fill in all fields");
+      }
+
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        const msg = error.message.toLowerCase();
 
+        // 👇 smarter error handling
+        if (msg.includes("invalid login credentials")) {
+          throw new Error("Wrong email or password");
+        }
+
+        if (msg.includes("email not confirmed")) {
+          throw new Error("Please verify your email before logging in");
+        }
+
+        if (msg.includes("network")) {
+          throw new Error("Network error. Check your connection");
+        }
+
+        throw new Error(error.message);
+      }
+
+      // success
       onNavigate("feed");
 
-      
     } catch (err) {
-      setError("Invalid login credentials");
+      setError(err.message || "Login failed");
     } finally {
       setLoading(false);
     }
@@ -46,34 +67,31 @@ export default function LoginPage({ onNavigate }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-white px-6 relative overflow-hidden">
 
-      {/* SOFT BACKGROUND GLOW */}
+      {/* BACKGROUND GLOW */}
       <div className="absolute top-[-120px] right-[-120px] w-[300px] h-[300px] bg-purple-200 blur-[120px] rounded-full" />
       <div className="absolute bottom-[-120px] left-[-120px] w-[300px] h-[300px] bg-indigo-200 blur-[120px] rounded-full" />
 
-      {/* CARD */}
       <div className="relative w-full max-w-md">
 
-        <div className="bg-white border border-gray-100 shadow-xl rounded-3xl p-7">
+        <div className="bg-white border shadow-xl rounded-3xl p-7">
 
           {/* HEADER */}
           <div className="text-center mb-7">
-
             <div className="w-14 h-14 mx-auto rounded-2xl bg-purple-600 text-white flex items-center justify-center shadow-md">
               <School />
             </div>
 
-            <h1 className="text-2xl font-bold mt-4 text-gray-900">
+            <h1 className="text-2xl font-bold mt-4">
               Welcome back
             </h1>
 
             <p className="text-sm text-gray-500 mt-2 leading-6">
-              Continue your campus journey — see posts, chat with friends, and stay connected.
+              Continue your campus journey and reconnect with friends.
             </p>
 
             <div className="flex justify-center mt-3 text-purple-400">
               <Sparkles size={16} />
             </div>
-
           </div>
 
           {/* FORM */}
@@ -93,7 +111,7 @@ export default function LoginPage({ onNavigate }) {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
-                  className="w-full h-12 pl-10 rounded-xl border border-gray-200 focus:outline-none focus:border-purple-400 transition"
+                  className="w-full h-12 pl-10 rounded-xl border focus:outline-none focus:border-purple-400"
                 />
               </div>
             </div>
@@ -112,7 +130,7 @@ export default function LoginPage({ onNavigate }) {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter password"
-                  className="w-full h-12 pl-10 pr-10 rounded-xl border border-gray-200 focus:outline-none focus:border-purple-400 transition"
+                  className="w-full h-12 pl-10 pr-10 rounded-xl border focus:outline-none focus:border-purple-400"
                 />
 
                 <button
@@ -127,7 +145,7 @@ export default function LoginPage({ onNavigate }) {
 
             {/* ERROR */}
             {error && (
-              <div className="text-sm text-red-500 bg-red-50 border border-red-100 p-3 rounded-xl">
+              <div className="text-sm text-red-600 bg-red-50 border border-red-100 p-3 rounded-xl">
                 {error}
               </div>
             )}
@@ -136,7 +154,7 @@ export default function LoginPage({ onNavigate }) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-12 rounded-xl bg-purple-600 text-white font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition shadow-md"
+              className="w-full h-12 rounded-xl bg-purple-600 text-white font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition"
             >
               {loading ? "Signing in..." : "Sign in"}
               {!loading && <ArrowRight size={18} />}
