@@ -1038,46 +1038,55 @@ export default function Feed({
 
 
 
-  const sharePost = async (id) => {
+  const sharePost = async (post) => {
     try {
-
-
-      if (!id) {
-        alert("Post not ready to share");
+      if (!post?.id) {
+        alert("Post not ready");
         return;
       }
 
-      // convert post UI → image
-      const dataUrl = await toPng(id, {
+      const postElement = document.getElementById(`post-${post.id}`);
+
+      console.log("postElement:", postElement);
+
+      if (!postElement) {
+        alert("Post element not found in DOM");
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke(
+        "share-post",
+        {
+          body: {
+            postId: post.id,
+            description: post.description,
+          },
+        }
+      );
+
+      if (error) throw error;
+
+      const dataUrl = await toPng(postElement, {
         cacheBust: true,
         pixelRatio: 2,
         backgroundColor: "#0b001a",
       });
 
       const blob = await (await fetch(dataUrl)).blob();
+
       const file = new File([blob], "socialgist-post.png", {
         type: "image/png",
       });
 
-      const text = post?.description || "Check this post on SocialGist";
+      await navigator.share({
+        title: data?.title || "SocialGist",
+        text: data?.text || post.description,
+        url: data?.shareUrl,
+        files: [file],
+      });
 
-      // WhatsApp / native share
-      if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({
-          title: "SocialGist",
-          text,
-          files: [file],
-        });
-      } else {
-        // fallback: download image
-        const link = document.createElement("a");
-        link.href = dataUrl;
-        link.download = "socialgist-post.png";
-        link.click();
-      }
     } catch (err) {
       console.error("Share failed:", err);
-      alert("Could not share post");
     }
   };
   // ================= LOADING =================
@@ -1316,9 +1325,9 @@ export default function Feed({
         {/* POSTS */}
         {posts.map((post) => {
           const parsed = post.content || {};
-
           return (
             <div
+              id={`post-${post.id}`}
               key={post.id}
               className="bg-white dark:bg-[#18191A] mb-4 sm:rounded-3xl overflow-hidden border border-gray-100 dark:border-white/5 shadow-sm hover:shadow-md transition"
             >
@@ -1402,7 +1411,7 @@ export default function Feed({
 
                       <button
                         onClick={() => {
-                          sharePost(post.id);
+                          sharePost(post, post.id);
                           setOpenMenuId(null);
                         }}
                         className="
@@ -1591,7 +1600,7 @@ export default function Feed({
                     </span>
                   </button>
                   <button
-                    onClick={() => sharePost(post.id)}
+                    onClick={() => sharePost(post, post.id)}
                     className="flex items-center justify-center gap-2 h-11 rounded-2xl bg-purple-500/10 text-purple-600"
                   >
                     <BiShare size={18} className="rotate-180" />
