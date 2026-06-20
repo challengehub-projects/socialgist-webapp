@@ -198,6 +198,23 @@ export default function ProfilePage() {
     }
   };
 
+  const handleInvite = async () => {
+    const userId = me?.id;
+
+    const inviteLink = `${window.location.origin}/signup?ref=${userId}`;
+
+    if (navigator.share) {
+      await navigator.share({
+        title: "Join me on Sociagist",
+        text: "Join me on this app!",
+        url: inviteLink,
+      });
+    } else {
+      await navigator.clipboard.writeText(inviteLink);
+      alert("Invite link copied!");
+    }
+  };
+
   // ================= FIELD COMPONENT =================
   const Field = ({ label, value }) => (
     <div className="py-4 border-b border-white/10">
@@ -404,15 +421,25 @@ export default function ProfilePage() {
 
                 </p>
 
+                <div className="mt-5 flex gap-3">
 
+                  {/* Update Profile */}
+                  <button
+                    onClick={() => navigate("/settings")}
+                    className="px-5 py-2 rounded-xl bg-black text-white"
+                  >
+                    Update Profile
+                  </button>
 
-                <button
-                  onClick={() => navigate("/settings")}
-                  className="mt-5 px-5 py-2 rounded-xl bg-black text-white"
-                >
-                 Update Profile
-                </button>
+                  {/* Invite Friends */}
+                  <button
+                    onClick={handleInvite}
+                    className="px-5 py-2 rounded-xl bg-blue-600 text-white"
+                  >
+                    Invite Friends
+                  </button>
 
+                </div>
 
               </div>
 

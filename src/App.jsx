@@ -20,6 +20,7 @@ import PostGate from "./pages/postGate";
 import PostPage from "./pages/post";
 
 import OneSignal from "react-onesignal";
+import MyPosts from "./pages/mypost";
 
 
 
@@ -134,6 +135,18 @@ export default function App() {
           path="/messages"
           element={
             session ? <Messages /> : <Navigate to="/" />
+          }
+        />
+
+        {/* MESSAGES */}
+        <Route
+          path="/mypost"
+          element={
+            session ? (
+              <MyPosts user={session.user} />
+            ) : (
+              <Navigate to="/" />
+            )
           }
         />
 

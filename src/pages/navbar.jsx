@@ -30,7 +30,8 @@ import {
   Settings,
   RefreshCcw,
   LogOut,
-  ChevronDown
+  ChevronDown,
+  FileText
 } from "lucide-react";
 
 /* import {
@@ -43,8 +44,7 @@ import EmojiPicker from "emoji-picker-react";
 import { supabase } from "../configs/supbase";
 import ProfileModal from "./profileModal";
 import { useNavigate } from "react-router-dom";
-
-
+import { FaSlack } from "react-icons/fa";
 
 
 
@@ -111,6 +111,11 @@ export default function TopNavbar({
 
   const [avatar, setAvatar] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [openSearch, setOpenSearch] = useState(false);
+  const [query, setQuery] = useState("");
+  const [users, setUsers] = useState([]);
+  const [loadingSearch, setLoadingSearch] = useState(false)
+
 
   const navigate = useNavigate();
 
@@ -282,7 +287,33 @@ export default function TopNavbar({
 
 
 
+  const searchUsers = async (text) => {
+    const value = text.trim();
 
+    setQuery(value);
+
+    if (!value) {
+      setUsers([]);
+      return;
+    }
+
+    setLoadingSearch(true);
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, full_name, username, avatar_url")
+      .or(`username.ilike.%${value}%,full_name.ilike.%${value}%`)
+      .limit(10);
+
+    if (error) {
+      console.error("Search error:", error);
+      setUsers([]);
+    } else {
+      setUsers(data || []);
+    }
+
+    setLoadingSearch(false);
+  };
 
 
   const getProfilePicture = async () => {
@@ -645,7 +676,7 @@ export default function TopNavbar({
       /*   await showToast(
           "Create something to post!"
         ); */
-     
+
 
       return;
     }
@@ -1001,6 +1032,7 @@ export default function TopNavbar({
 
             <button
               className={`${iconBtn} md:hidden`}
+              onClick={() => setOpenSearch(true)}
             >
               <Search size={18} />
             </button>
@@ -1108,6 +1140,17 @@ export default function TopNavbar({
               </div>
             </button>
 
+            <button
+              onClick={() => {
+                setShowProfileMenu(false);
+                navigate("/mypost");
+              }}
+              className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-100 dark:hover:bg-white/5 transition dark:text-white"
+            >
+              <FileText size={20} />
+              <span>My Posts</span>
+            </button>
+
             {/* SETTINGS */}
             <button
               onClick={() => {
@@ -1122,7 +1165,7 @@ export default function TopNavbar({
 
             {/* SWITCH ACCOUNT */}
             <button
-              onClick={async() => {
+              onClick={async () => {
                 await supabase.auth.signOut();
                 sessionStorage.clear();
                 window.location.reload();
@@ -1378,6 +1421,7 @@ export default function TopNavbar({
               </Rnd>
             ))}
 
+
             {/* EMOJI PICKER */}
 
             {showEmoji && (
@@ -1566,9 +1610,67 @@ export default function TopNavbar({
 
           </div>
 
+
+
         </div >
       )
       }
+
+      {openSearch && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex justify-center items-start pt-20">
+
+          <div className="bg-white w-[90%] max-w-md rounded-xl shadow-lg p-3">
+
+            {/* Search input */}
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => searchUsers(e.target.value)}
+              placeholder="Search users..."
+              className="w-full p-3 border rounded-lg outline-none"
+            />
+
+            {/* Results */}
+            <div className="mt-3 max-h-72 overflow-y-auto">
+              {loadingSearch && (
+                <p className="text-sm text-gray-500">Searching...</p>
+              )}
+
+              {!loading && users.length === 0 && query && (
+                <p className="text-sm text-gray-400">No users found</p>
+              )}
+
+              {users.map((user) => (
+                <div
+                  key={user.id}
+                  className="flex items-center gap-3 p-2 hover:bg-gray-100 rounded cursor-pointer"
+                  onClick={() => navigate(`/profile/${user.id}`)}
+                >
+                  <img
+                    src={user.avatar_url || "/default.png"}
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+
+                  <div>
+                    <p className="font-medium">{user.full_name}</p>
+                    <p className="text-xs text-gray-500">@{user.username}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Close button */}
+            <button
+              onClick={() => setOpenSearch(false)}
+              className="mt-3 w-full text-sm text-gray-600"
+            >
+              Close
+            </button>
+
+          </div>
+        </div>
+      )}
+
 
     </>
   );

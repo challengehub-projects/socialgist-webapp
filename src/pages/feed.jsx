@@ -202,15 +202,46 @@ export default function Feed({
     const date = new Date(dateString);
     const now = new Date();
 
-    const diff = Math.floor((now - date) / 1000); // seconds
+    const diffInSeconds = Math.floor((now - date) / 1000);
 
-    if (diff < 60) return "just now";
-    if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)} hr ago`;
-    if (diff < 172800) return "yesterday";
+    const minute = 60;
+    const hour = 60 * minute;
+    const day = 24 * hour;
+    const week = 7 * day;
+    const month = 30 * day;
+    const year = 365 * day;
 
-    return date.toLocaleDateString();
+    if (diffInSeconds < 60) return "just now";
+
+    if (diffInSeconds < hour) {
+      const mins = Math.floor(diffInSeconds / minute);
+      return `${mins} min${mins > 1 ? "s" : ""} ago`;
+    }
+
+    if (diffInSeconds < day) {
+      const hrs = Math.floor(diffInSeconds / hour);
+      return `${hrs} hr${hrs > 1 ? "s" : ""} ago`;
+    }
+
+    if (diffInSeconds < week) {
+      const days = Math.floor(diffInSeconds / day);
+      return `${days} day${days > 1 ? "s" : ""} ago`;
+    }
+
+    if (diffInSeconds < month) {
+      const weeks = Math.floor(diffInSeconds / week);
+      return `${weeks} week${weeks > 1 ? "s" : ""} ago`;
+    }
+
+    if (diffInSeconds < year) {
+      const months = Math.floor(diffInSeconds / month);
+      return `${months} month${months > 1 ? "s" : ""} ago`;
+    }
+
+    const years = Math.floor(diffInSeconds / year);
+    return `${years} year${years > 1 ? "s" : ""} ago`;
   };
+
 
   const openComments = async (post) => {
     setOpen(true);
@@ -598,108 +629,88 @@ export default function Feed({
 
 
 
-  // ================= FETCH POSTS =================
-
-
-  const fetchPosts = async (
-    showLoader = false
-  ) => {
+  const fetchPosts = async (showLoader = false) => {
     try {
-
-      if (showLoader) {
-        setLoading(true);
-      }
+      if (showLoader) setLoading(true);
 
       setRefreshing(true);
-
-
 
       const from = page * POSTS_PER_PAGE;
       const to = from + POSTS_PER_PAGE - 1;
 
-      /*      const { data, error } =
-             await supabase
-               .from("posts")
-               .select("*")
-               .order("created_at", {
-                 ascending: false,
-               })
-               .range(from, to); */
+      const tenHoursAgo = new Date(
+        Date.now() - 10 * 60 * 60 * 1000
+      ).toISOString();
+
       let query = supabase
         .from("posts")
-        .select("*")
-        .order("created_at", {
-          ascending: false,
-        });
+        .select("*");
 
-      // ================= CATEGORY FILTER =================
+      // category filter
       if (activeTab !== "all") {
         query = query.eq("category", activeTab);
       }
 
-      const { data, error } = await query.range(from, to);
+      const { data, error } = await query;
 
       if (error) {
         console.log(error);
-
         setRefreshing(false);
         setLoading(false);
-
         return;
       }
 
+      // ================= SMART SORT (HYBRID ALGO) =================
+      const scored = data.map((post) => {
+        const isRecent =
+          new Date(post.created_at) > new Date(tenHoursAgo);
+
+        return {
+          ...post,
+          score: isRecent
+            ? Math.random() + 2 // boost recent posts
+            : Math.random(),     // random older posts
+        };
+      });
+
+      // sort by score (mix of random + recent boost)
+      const sorted = scored.sort((a, b) => b.score - a.score);
+
+      // pagination AFTER sorting
+      const paginated = sorted.slice(from, to + 1);
+
+      // ================= PROFILE IMAGES =================
       const imageMap = {};
 
       await Promise.all(
-        data.map(async (postData) => {
+        paginated.map(async (postData) => {
           const avatarUrl = await getProfileImage(postData.user_id);
-
           imageMap[postData.user_id] = avatarUrl;
         })
       );
 
       setProfileImages(imageMap);
 
+      // ================= FORMAT POSTS =================
+      const formatted = paginated.map((post) => ({
+        ...post,
+        likes_count: post.likes_count,
+      }));
 
-      if (data) {
-        let formatted =
-          data.map((post) => ({
-            ...post,
-            likes_count:
-              post.likes_count,
-          }));
+      setPosts((prev) => {
+        const merged =
+          page === 0 ? formatted : [...prev, ...formatted];
 
+        const uniquePosts = merged.filter(
+          (post, index, self) =>
+            index === self.findIndex((p) => p.id === post.id)
+        );
 
+        return uniquePosts;
+      });
 
-
-        setPosts((prev) => {
-          const merged =
-            page === 0
-              ? formatted
-              : [...prev, ...formatted];
-
-          const uniquePosts =
-            merged.filter(
-              (post, index, self) =>
-                index ===
-                self.findIndex(
-                  (p) => p.id === post.id
-                )
-            );
-
-          return uniquePosts;
-        });
-
-
-        if (
-          !data ||
-          data.length < POSTS_PER_PAGE
-        ) {
-          setHasMore(false);
-        } else {
-          setHasMore(true);
-        }
-      }
+      // ================= HAS MORE =================
+      setHasMore(paginated.length === POSTS_PER_PAGE);
     } catch (err) {
       console.log(err);
     }
@@ -997,6 +1008,27 @@ export default function Feed({
   };
 
 
+  const sendNotification = async ({ userId, message, type }) => {
+    const { data, error } = await supabase.functions.invoke(
+      "send-notifications",
+      {
+        body: {
+          userId,
+          message,
+          type: type || "manual",
+        },
+      }
+    );
+
+    if (error) {
+      console.error("Edge Function error:", error.message);
+      return;
+    }
+
+    return data;
+  };
+
+
   const likePost = async (postId) => {
 
     if (!me?.id || !postId) return;
@@ -1006,12 +1038,11 @@ export default function Feed({
     const postOwnerId = post?.user_id;
 
 
-  await supabase.functions.invoke("send-notification", {
-  body: {
-    userId: postOwnerId,
-    message: `${me.full_name} liked your post`,
-  },
-});
+    await sendNotification({
+      userId: postOwnerId,
+      message: `${me.full_name} liked your post`,
+      type: "like",
+    });
 
     if (!postOwnerId) return;
 
@@ -1160,13 +1191,24 @@ export default function Feed({
 
       const postElement = document.getElementById(`post-${post.id}`);
 
-      console.log("postElement:", postElement);
-
       if (!postElement) {
         alert("Post element not found in DOM");
         return;
       }
 
+      // ================= INCREMENT SHARE COUNT =================
+      const { error: updateError } = await supabase
+        .from("posts")
+        .update({
+          shares_count: (post.shares_count || 0) + 1,
+        })
+        .eq("id", post.id);
+
+      if (updateError) {
+        console.log("Share count update error:", updateError);
+      }
+
+      // ================= CALL EDGE FUNCTION =================
       const { data, error } = await supabase.functions.invoke(
         "share-post",
         {
@@ -1179,6 +1221,7 @@ export default function Feed({
 
       if (error) throw error;
 
+      // ================= CONVERT POST TO IMAGE =================
       const dataUrl = await toPng(postElement, {
         cacheBust: true,
         pixelRatio: 2,
@@ -1191,6 +1234,7 @@ export default function Feed({
         type: "image/png",
       });
 
+      // ================= NATIVE SHARE =================
       await navigator.share({
         title: data?.title || "SocialGist",
         text: data?.text || post.description,
@@ -1214,6 +1258,23 @@ export default function Feed({
         </div>
       );
     } */
+
+  /*  const getUserProfile = async (userId) => {
+     if (!userId) return null;
+ 
+     const { data, error } = await supabase
+       .from("profiles")
+       .select("id, full_name, username, avatar_url")
+       .eq("id", userId)
+       .single();
+ 
+     if (error) {
+       console.log("Profile error:", error);
+       return null;
+     }
+ 
+     return data;
+   }; */
 
   if (loading) {
     return (
@@ -1465,7 +1526,7 @@ export default function Feed({
                     <div
                       className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-fuchsia-500 flex items-center justify-center text-white font-bold text-sm"
                     >
-                      {(post.profile_name || "U").charAt(0).toUpperCase()}
+                      {(post.profile_name || "https://www.gravatar.com/avatar/?d=mp&s=200").charAt(0).toUpperCase()}
                     </div>
                   )}
 
