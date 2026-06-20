@@ -14,27 +14,78 @@ import { useNavigate } from "react-router-dom";
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      const { data: auth } = await supabase.auth.getUser();
-      const userId = auth?.user?.id;
 
-      if (!userId) return;
+useEffect(() => {
+  const fetchNotifications = async () => {
+    setLoading(true);
 
-      const { data, error } = await supabase
-        .from("notifications")
-        .select("*")
-        .eq("receiver_id", userId)
-        .order("created_at", { ascending: false });
+    const { data: auth } = await supabase.auth.getUser();
+    const userId = auth?.user?.id;
 
-      if (!error) setNotifications(data || []);
+    if (!userId) {
       setLoading(false);
-    };
+      return;
+    }
 
-    fetchNotifications();
-  }, []);
+    setUserId(userId);
+    
+  console.log(userId)
+
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("receiver_id", userId)
+      .order("created_at", { ascending: false });
+
+      console.log(data)
+
+    if (error) {
+      console.log("Fetch notifications error:", error);
+      setLoading(false);
+      return;
+    }
+
+    setNotifications(data || []);
+    setLoading(false);
+  };
+
+  fetchNotifications();
+}, []);
+
+  useEffect(() => {
+  if (!userId) return;
+
+  const channel = supabase
+    .channel(`notifications-${userId}`) // unique channel per user
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "notifications",
+        filter: `receiver_id=eq.${userId}`,
+      },
+      (payload) => {
+        console.log("New notification:", payload.new);
+
+        setNotifications((prev) => {
+          // prevent duplicates
+          const exists = prev.some((n) => n.id === payload.new.id);
+          if (exists) return prev;
+
+          return [payload.new, ...prev];
+        });
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [userId]);
 
   const getIcon = (type) => {
     switch (type) {

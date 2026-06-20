@@ -26,8 +26,10 @@ import { sendNotification } from "../utils/sendNotifications";
 import ProfileModal from "./profileModal";
 import { toPng } from "html-to-image";
 import { data } from "react-router-dom";
-import { createNotification } from "../utils/createNotifications";
+/* import { createNotification } from "../utils/createNotifications"; */
 /* import Share from "@capacitor/share"; */
+import OneSignal from "react-onesignal";
+
 
 
 
@@ -111,6 +113,19 @@ export default function Feed({
   };
 
 
+  useEffect(() => {
+    const setupUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      const userId = data?.user?.id;
+
+      if (!userId) return;
+
+      // tag user in OneSignal
+      OneSignal.setExternalUserId(userId);
+    };
+
+    setupUser();
+  }, []);
 
   const toggleFollow = async (profile) => {
     if (!me?.id || !profile?.id) return;
@@ -225,44 +240,44 @@ export default function Feed({
     }
   };
 
-  useEffect(() => {
-    if (!me?.id) return;
-
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-
-    window.OneSignalDeferred.push(async function (OneSignal) {
-      try {
-
-        // wait until OneSignal is ready
-        const permission = OneSignal.Notifications.permission;
-
-        if (!permission) {
-          await OneSignal.Notifications.requestPermission();
+  /*   useEffect(() => {
+      if (!me?.id) return;
+  
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+  
+      window.OneSignalDeferred.push(async function (OneSignal) {
+        try {
+  
+          // wait until OneSignal is ready
+          const permission = OneSignal.Notifications.permission;
+  
+          if (!permission) {
+            await OneSignal.Notifications.requestPermission();
+          }
+  
+          // wait for subscription
+          const subscriptionId =
+            OneSignal.User.PushSubscription.id;
+  
+          console.log("Subscription:", subscriptionId);
+  
+          if (subscriptionId) {
+            await OneSignal.login(String(me.id));
+  
+            console.log(
+              "OneSignal linked:",
+              me.id
+            );
+          } else {
+            console.log("No push subscription yet");
+          }
+  
+        } catch (err) {
+          console.error("OneSignal setup error:", err);
         }
-
-        // wait for subscription
-        const subscriptionId =
-          OneSignal.User.PushSubscription.id;
-
-        console.log("Subscription:", subscriptionId);
-
-        if (subscriptionId) {
-          await OneSignal.login(String(me.id));
-
-          console.log(
-            "OneSignal linked:",
-            me.id
-          );
-        } else {
-          console.log("No push subscription yet");
-        }
-
-      } catch (err) {
-        console.error("OneSignal setup error:", err);
-      }
-    });
-
-  }, [me?.id]);
+      });
+  
+    }, [me?.id]); */
 
   useEffect(() => {
     setPage(0);
@@ -944,109 +959,197 @@ export default function Feed({
 
 
   useEffect(() => {
+
     if (!me?.id) return;
 
     const localLikes = localStorage.getItem("liked_posts_v1");
     setLikedPosts(localLikes ? JSON.parse(localLikes) : {});
   }, [me?.id]);
 
+
+  const createNotification = async ({
+    receiver_id,
+    sender,
+    type,
+    message,
+    post_id = null,
+  }) => {
+    try {
+      if (!receiver_id || !sender?.id) return;
+      if (receiver_id === sender.id) return;
+
+      const { error } = await supabase.from("notifications").insert({
+        receiver_id,
+        sender_id: sender.id,
+        sender_name: sender.full_name || "Someone",
+        type,
+        message,
+        post_id,
+        read: false,
+      });
+
+      if (error) {
+        console.error("Notification error:", error);
+      }
+    } catch (err) {
+      console.error("Notification exception:", err);
+    }
+  };
+
+
   const likePost = async (postId) => {
 
     if (!me?.id || !postId) return;
 
-    try {
-      if (animatingLike === postId) return;
 
-      setAnimatingLike(postId);
-      setTimeout(() => setAnimatingLike(null), 400);
+    const post = posts.find((p) => p.id === postId);
+    const postOwnerId = post?.user_id;
 
-      const alreadyLiked = !!likedPosts[postId];
 
-      // ================= UI UPDATE =================
-      const updatedPosts = posts.map((post) => {
-        if (post.id === postId) {
-          return {
-            ...post,
-            likes_count: alreadyLiked
-              ? Math.max(0, (post.likes_count || 0) - 1)
-              : (post.likes_count || 0) + 1,
-          };
-        }
-        return post;
+  await supabase.functions.invoke("send-notification", {
+  body: {
+    userId: postOwnerId,
+    message: `${me.full_name} liked your post`,
+  },
+});
+
+    if (!postOwnerId) return;
+
+    const alreadyLiked = !!likedPosts[postId];
+
+    // update UI first (your logic stays same)
+    setLikedPosts((prev) => ({
+      ...prev,
+      [postId]: !alreadyLiked,
+    }));
+
+    // only send notification when LIKING (not unliking)
+    if (!alreadyLiked) {
+
+      await createNotification({
+        receiver_id: postOwnerId,
+        sender: {
+          id: me.id,
+          full_name: me.full_name,
+        },
+        type: "like",
+        message: "liked your post",
+        post_id: postId,
       });
-
-      setPosts(updatedPosts);
-
-      // ================= LOCAL CACHE =================
-      const updatedLikes = {
-        ...likedPosts,
-        [postId]: !alreadyLiked,
-      };
-
-      setLikedPosts(updatedLikes);
-
-      localStorage.setItem(
-        "liked_posts_v1",
-        JSON.stringify(updatedLikes)
-      );
-
-      // ================= OFFLINE QUEUE =================
-      const pendingKey = "pending_likes";
-      const pendingRaw = localStorage.getItem(pendingKey);
-      const pending = pendingRaw ? JSON.parse(pendingRaw) : [];
-
-      const action = alreadyLiked ? "unlike" : "like";
-
-      pending.push({
-        postId,
-        action,
-        userId: me.id,
-        timestamp: Date.now(),
-      });
-
-      localStorage.setItem(pendingKey, JSON.stringify(pending));
-
-      // ================= NETWORK CHECK =================
-      const online = navigator.onLine;
-
-      if (!online) return;
-
-      // ================= SYNC TO SUPABASE =================
-      const { data: currentPost, error: fetchError } = await supabase
-        .from("posts")
-        .select("likes_count")
-        .eq("id", postId)
-        .single();
-
-      if (fetchError) {
-        console.log(fetchError);
-        return;
-      }
-
-      const currentLikes = currentPost?.likes_count || 0;
-
-      const newLikes = alreadyLiked
-        ? Math.max(0, currentLikes - 1)
-        : currentLikes + 1;
-
-      const { error } = await supabase
-        .from("posts")
-        .update({ likes_count: newLikes })
-        .eq("id", postId);
-
-      if (error) {
-        console.log("DB UPDATE ERROR:", error);
-        return;
-      }
-
-      console.log("LIKE SYNCED:", postId, newLikes);
-    } catch (err) {
-      console.log("LIKE ERROR:", err);
+      console.log("hi")
     }
+
   };
+
+  /*  const likePost = async (post) => {
+ 
+     if (!me?.id || !post.id) return;
+ 
+     try {
+       if (animatingLike === post.id) return;
+ 
+       setAnimatingLike(post.id);
+       setTimeout(() => setAnimatingLike(null), 400);
+ 
+       const alreadyLiked = !!likedPosts[post.id];
+ 
+ 
+       // ================= UI UPDATE =================
+       const updatedPosts = posts.map((post) => {
+         if (post.id === post.id) {
+           return {
+             ...post,
+             likes_count: alreadyLiked
+               ? Math.max(0, (post.likes_count || 0) - 1)
+               : (post.likes_count || 0) + 1,
+           };
+         }
+         return post;
+       });
+ 
+       setPosts(updatedPosts);
+ 
+ 
+       // ================= LOCAL CACHE =================
+       const updatedLikes = {
+         ...likedPosts,
+         [post.id]: !alreadyLiked,
+       };
+ 
+       setLikedPosts(updatedLikes);
+ 
+       localStorage.setItem(
+         "liked_posts_v1",
+         JSON.stringify(updatedLikes)
+       );
+ 
+       // ================= OFFLINE QUEUE =================
+       const pendingKey = "pending_likes";
+       const pendingRaw = localStorage.getItem(pendingKey);
+       const pending = pendingRaw ? JSON.parse(pendingRaw) : [];
+ 
+       const action = alreadyLiked ? "unlike" : "like";
+       const postId = post.id
+       pending.push({
+         postId,
+         action,
+         userId: me.id,
+         timestamp: Date.now(),
+       });
+ 
+       localStorage.setItem(pendingKey, JSON.stringify(pending));
+ 
+       // ================= NETWORK CHECK =================
+       const online = navigator.onLine;
+ 
+       if (!online) return;
+ 
+       // ================= SYNC TO SUPABASE =================
+       const { data: currentPost, error: fetchError } = await supabase
+         .from("posts")
+         .select("likes_count")
+         .eq("id", post.id)
+         .single();
+ 
+ 
+       await createNotification({
+         receiver_id: post.user_id,   // 👈 person who owns the post
+         sender: me.id,               // 👈 person who liked
+         type: "like",
+         message: "liked your post",
+         post_id: postId,
+       });
+ 
+ 
+       if (fetchError) {
+         console.log(fetchError);
+         return;
+       }
+ 
+       const currentLikes = currentPost?.likes_count || 0;
+ 
+       const newLikes = alreadyLiked
+         ? Math.max(0, currentLikes - 1)
+         : currentLikes + 1;
+ 
+       const { error } = await supabase
+         .from("posts")
+         .update({ likes_count: newLikes })
+         .eq("id", post.id);
+ 
+ 
+ 
+       if (error) {
+         console.log("DB UPDATE ERROR:", error);
+         return;
+       }
+ 
+       console.log("LIKE SYNCED:", postId, newLikes);
+     } catch (err) {
+       console.log("LIKE ERROR:", err);
+     }
+   }; */
   // ================= SHARE (WEB ONLY) =================
-
-
 
   const sharePost = async (post) => {
     try {
@@ -1335,7 +1438,7 @@ export default function Feed({
         {/* POSTS */}
         {posts.map((post) => {
           const parsed = post.content || {};
-          console.log(post)
+
           return (
             <div
               id={`post-${post.id}`}

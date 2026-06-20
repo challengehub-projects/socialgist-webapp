@@ -1,8 +1,5 @@
 import { supabase } from "../configs/supbase";
 
-/**
- * Create a notification in Supabase
- */
 export const createNotification = async ({
   receiver_id,
   sender,
@@ -22,11 +19,10 @@ export const createNotification = async ({
       message,
       post_id,
       read: false,
-      created_at: new Date().toISOString(),
     });
 
     if (error) {
-      console.error("Notification error:", error.message);
+      console.error("Notification error:", error);
     }
   } catch (err) {
     console.error("Notification exception:", err);
