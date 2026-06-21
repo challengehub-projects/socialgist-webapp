@@ -35,8 +35,8 @@ export default function App() {
     return () => clearTimeout(timer);
   }, []);
 
-  useEffect(() => {
- /*    OneSignal.init({
+ /* useEffect(() => {
+    OneSignal.init({
       appId: "e984113d-f3be-4e8a-8cc4-928f4fb48b62",
     });
   }, []); */
