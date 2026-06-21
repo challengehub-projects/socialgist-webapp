@@ -19,7 +19,7 @@ import SettingsPage from "./pages/settings";
 import PostGate from "./pages/postGate";
 import PostPage from "./pages/post";
 
-import OneSignal from "react-onesignal";
+/* import OneSignal from "react-onesignal"; */
 import MyPosts from "./pages/mypost";
 
 
@@ -36,10 +36,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    OneSignal.init({
+ /*    OneSignal.init({
       appId: "e984113d-f3be-4e8a-8cc4-928f4fb48b62",
     });
-  }, []);
+  }, []); */
 
   // ================= AUTH =================
   useEffect(() => {
